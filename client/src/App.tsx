@@ -1,34 +1,144 @@
+import { Route, Routes, useLocation } from "react-router-dom";
+import { Feed } from "./components/Feed";
+import { Header } from "./components/Header";
+import { User } from "./components/User";
+import { Compose } from "./components/Compose";
+import { FloatingWriteButton } from "./components/FloatingWriteButton";
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
-import "./App.css";
+import { PostDetail } from "./components/PostDetail";
+import { ProfileSetupModal } from "./components/ProfileSetupModal";
+import type { UserProfile } from "./types/user";
+
+const STORY_CHAIN_ID_HEX = "0x5E9"; // 1513
+const STORY_TESTNET_PARAMS = {
+  chainId: STORY_CHAIN_ID_HEX,
+  chainName: "Story Testnet",
+  nativeCurrency: {
+    name: "IP",
+    symbol: "IP",
+    decimals: 18,
+  },
+  rpcUrls: ["https://testnet.storyrpc.io"],
+  blockExplorerUrls: ["https://testnet.storyscan.app"],
+};
 
 function App() {
-  const [count, setCount] = useState(0);
+  const location = useLocation();
+  const isComposePage = location.pathname.startsWith("/compose");
+
+  const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  const [pendingAddress, setPendingAddress] = useState<string | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const handleConnectWallet = async () => {
+    if (!window.ethereum) {
+      alert("Metamask not found. Please install Metamask extension.");
+      return;
+    }
+
+    try {
+      try {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [STORY_TESTNET_PARAMS],
+        });
+      } catch (err) {
+        console.log("wallet_addEthereumChain error (무시 가능):", err);
+      }
+
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: STORY_CHAIN_ID_HEX }],
+      });
+
+      const accounts = (await window.ethereum.request({
+        method: "eth_requestAccounts",
+      })) as string[];
+
+      if (!accounts || accounts.length === 0) return;
+
+      const selected = accounts[0];
+      const message = [
+        "Sign in to Story Feed",
+        `Address: ${selected}`,
+        `Time: ${new Date().toISOString()}`,
+      ].join("\n");
+
+      await window.ethereum.request({
+        method: "personal_sign",
+        params: [message, selected],
+      });
+
+      setPendingAddress(selected);
+      setIsProfileModalOpen(true);
+    } catch (error) {
+      console.error("Wallet connection error:", error);
+    }
+  };
+
+  const handleDisconnectWallet = () => {
+    setIsWalletConnected(false);
+    setUserProfile(null);
+    setPendingAddress(null);
+    setIsProfileModalOpen(false);
+  };
+
+  const handleSaveProfile = (data: {
+    nickname: string;
+    avatarDataUrl?: string;
+  }) => {
+    if (!pendingAddress) return;
+
+    const profile: UserProfile = {
+      address: pendingAddress,
+      nickname: data.nickname,
+      avatarUrl: data.avatarDataUrl,
+    };
+
+    setUserProfile(profile);
+    setIsWalletConnected(true);
+    setPendingAddress(null);
+    setIsProfileModalOpen(false);
+  };
+
+  const handleCancelProfileSetup = () => {
+    setPendingAddress(null);
+    setIsProfileModalOpen(false);
+    setIsWalletConnected(false);
+    setUserProfile(null);
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="min-h-dvh bg-black text-white pb-16 flex flex-col overflow-x-hidden text-sm md:text-base lg:text-lg">
+      <Header profile={userProfile} />
+      <main className="flex-1 w-full max-w-full mx-auto overflow-y-auto">
+        <Routes>
+          <Route path="/" element={<Feed />} />
+          <Route
+            path="/user"
+            element={
+              <User
+                isWalletConnected={isWalletConnected}
+                onConnectWallet={handleConnectWallet}
+                onDisconnectWallet={handleDisconnectWallet}
+                profile={userProfile ?? undefined}
+              />
+            }
+          />
+          <Route path="/compose" element={<Compose />} />
+          <Route path="/post/:id" element={<PostDetail />} />
+        </Routes>
+      </main>
+      {!isComposePage && isWalletConnected && <FloatingWriteButton />}
+      <ProfileSetupModal
+        isOpen={isProfileModalOpen}
+        address={pendingAddress}
+        onCancel={handleCancelProfileSetup}
+        onSave={handleSaveProfile}
+      />
+    </div>
   );
 }
 
