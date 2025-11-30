@@ -31,4 +31,5 @@ export type PostRecord = {
   is_repost?: boolean;
   depth?: number;
   parent_post_id?: string | null;
+  nickname?: string;
 };

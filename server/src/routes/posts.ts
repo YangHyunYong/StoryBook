@@ -13,29 +13,21 @@ router.get("/", async (req: Request, res: Response) => {
 
   const { data, error } = await supabase
     .from(TABLE)
-    .select("*, users(nickname)")
+    .select("*")
     .order("timestamp", { ascending: false })
     .limit(Number.isFinite(limit) && limit > 0 ? limit : 50);
 
   if (error) {
     return res.status(500).json({ error: error.message });
   }
-  const posts = (data ?? []).map((row: any) => {
-    const nicknameFromJoin = row?.users?.nickname;
-    const { users, ...rest } = row;
-    return { ...rest, nickname: nicknameFromJoin };
-  });
-  return res.json({ posts });
+  return res.json({ posts: data });
 });
 
-router.get("/detail", async (req: Request, res: Response) => {
-  const id = getPostIdFromHeader(req);
-  if (!id) {
-    return res.status(400).json({ error: "x-post-id header is required" });
-  }
+router.get("/:id", async (req: Request, res: Response) => {
+  const id = req.params.id;
   const { data, error } = await supabase
     .from(TABLE)
-    .select("*, users(nickname)")
+    .select("*")
     .eq("id", id)
     .maybeSingle();
 
@@ -45,10 +37,8 @@ router.get("/detail", async (req: Request, res: Response) => {
   if (!data) {
     return res.status(404).json({ error: "Post not found" });
   }
-  const nicknameFromJoin = (data as any)?.users?.nickname;
-  const { users, ...rest } = data as any;
   return res.json({
-    post: { ...rest, nickname: nicknameFromJoin },
+    post: data,
   });
 });
 
@@ -71,7 +61,7 @@ router.post("/", async (req: Request, res: Response) => {
   // verify user exists
   const { data: user, error: userError } = await supabase
     .from("users")
-    .select("id")
+    .select("id, nickname")
     .eq("id", userId)
     .maybeSingle();
   if (userError) {
@@ -88,6 +78,7 @@ router.post("/", async (req: Request, res: Response) => {
     timestamp,
     likes,
     reposts,
+    nickname: (user as any)?.nickname,
   };
   const { error } = await supabase.from(TABLE).insert(record);
 
@@ -97,17 +88,15 @@ router.post("/", async (req: Request, res: Response) => {
   // fetch with join to include latest nickname
   const { data: created, error: fetchCreatedError } = await supabase
     .from(TABLE)
-    .select("*, users(nickname)")
+    .select("*")
     .eq("id", id)
     .maybeSingle();
   if (fetchCreatedError) {
     return res.status(500).json({ error: fetchCreatedError.message });
   }
-  const nicknameFromJoin = (created as any)?.users?.nickname;
-  const { users: createdUsersJoin, ...restCreated } = created as any;
   return res
     .status(201)
-    .json({ post: { ...restCreated, nickname: nicknameFromJoin } });
+    .json({ post: created });
 });
 
 // legacy delta likes route removed (use PUT/DELETE /posts/likes or POST /posts/likes)
@@ -118,18 +107,11 @@ function getUserId(req: Request): string {
   return String(req.header("x-user-id") ?? "").trim();
 }
 
-function getPostIdFromHeader(req: Request): string {
-  return String(req.header("x-post-id") ?? "").trim();
-}
-
 // User-scoped interactions now supported via POST toggle endpoints only
 
 // Toggle like: first tap -> like, second tap -> unlike
-router.post("/likes", async (req: Request, res: Response) => {
-  const id = getPostIdFromHeader(req);
-  if (!id) {
-    return res.status(400).json({ error: "x-post-id header is required" });
-  }
+router.post("/:id/likes", async (req: Request, res: Response) => {
+  const id = req.params.id;
   const userId = getUserId(req);
   if (!userId) {
     return res.status(400).json({ error: "x-user-id header is required" });
@@ -196,7 +178,7 @@ router.post("/likes", async (req: Request, res: Response) => {
 
   const { data: post, error: fetchError } = await supabase
     .from(TABLE)
-    .select("*, users(nickname)")
+    .select("*")
     .eq("id", id)
     .maybeSingle();
   if (fetchError) {
@@ -213,20 +195,15 @@ router.post("/likes", async (req: Request, res: Response) => {
     .eq("user_id", userId)
     .maybeSingle();
 
-  const nicknameFromJoin2 = (post as any)?.users?.nickname;
-  const { users: usersJoin1, ...rest1 } = post as any;
   return res.json({
-    post: { ...rest1, nickname: nicknameFromJoin2 },
+    post: post,
     liked: Boolean(likedRow),
   });
 });
 
 // Toggle repost: first tap -> repost, second tap -> unrepost
-router.post("/reposts", async (req: Request, res: Response) => {
-  const id = getPostIdFromHeader(req);
-  if (!id) {
-    return res.status(400).json({ error: "x-post-id header is required" });
-  }
+router.post("/:id/reposts", async (req: Request, res: Response) => {
+  const id = req.params.id;
   const userId = getUserId(req);
   if (!userId) {
     return res.status(400).json({ error: "x-user-id header is required" });
@@ -314,6 +291,7 @@ router.post("/reposts", async (req: Request, res: Response) => {
       is_repost: true,
       depth: (Number((parentPost as any).depth) || 0) + 1,
       parent_post_id: id,
+      nickname: (userExists as any)?.nickname,
     };
     const { error: insertPostError } = await supabase
       .from(TABLE)
@@ -325,7 +303,7 @@ router.post("/reposts", async (req: Request, res: Response) => {
 
   const { data: post, error: fetchError } = await supabase
     .from(TABLE)
-    .select("*, users(nickname)")
+    .select("*")
     .eq("id", id)
     .maybeSingle();
   if (fetchError) {
@@ -342,10 +320,8 @@ router.post("/reposts", async (req: Request, res: Response) => {
     .eq("user_id", userId)
     .maybeSingle();
 
-  const nicknameFromJoin3 = (post as any)?.users?.nickname;
-  const { users: usersJoin2, ...rest2 } = post as any;
   return res.json({
-    post: { ...rest2, nickname: nicknameFromJoin3 },
+    post: post,
     reposted: Boolean(repostRow),
     repost_id: createdRepostId,
   });

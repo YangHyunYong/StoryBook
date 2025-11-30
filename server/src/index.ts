@@ -17,7 +17,11 @@ app.get("/", (req: Request, res: Response) => {
 app.use("/posts", postsRouter);
 app.use("/users", usersRouter);
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+export { app };
+
+if (require.main === module) {
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
