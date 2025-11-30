@@ -1,6 +1,8 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import postsRouter from "./routes/posts";
+import usersRouter from "./routes/users";
 
 dotenv.config();
 
@@ -11,6 +13,9 @@ app.use(express.json());
 app.get("/", (req: Request, res: Response) => {
   res.json({ message: "TypeScript Node server is running" });
 });
+
+app.use("/posts", postsRouter);
+app.use("/users", usersRouter);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
