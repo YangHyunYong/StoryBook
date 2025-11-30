@@ -6,3 +6,6 @@ dist/
 .DS_Store/
 
 .env
+
+sql/
+package-lock.json
