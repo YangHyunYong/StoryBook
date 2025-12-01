@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { LicenseType, LicenseSelectionResult } from "../types/license";
+import { createStoryClient } from "../utils/storyClient";
+import { PILFlavor, WIP_TOKEN_ADDRESS } from "@story-protocol/core-sdk";
+import { toHex } from "viem";
 
 interface LicenseSelectionModalProps {
   isOpen: boolean;
@@ -127,28 +130,119 @@ export function LicenseSelectionModal({
     setStep(3);
   };
 
-  const handlePost = () => {
-    const result: LicenseSelectionResult = {
-      licenses: selected,
-    };
+  const handlePost = async () => {
+    try {
+      // Story Protocol 클라이언트 생성
+      const client = await createStoryClient();
 
-    if (selected.includes("COMMERCIAL_USE")) {
-      result.commercialUse = {
-        priceIp: Number(commercialUsePrice),
-        revenueSharePct: Number(commercialUseShare),
+      // 라이선스 텀 데이터 생성
+      const licenseTermsData = [];
+
+      if (selected.includes("OPEN_USE")) {
+        licenseTermsData.push({
+          terms: PILFlavor.creativeCommonsAttribution({
+            currency: WIP_TOKEN_ADDRESS,
+            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
+          }),
+        });
+      }
+
+      if (selected.includes("COMMERCIAL_USE")) {
+        const price = Number(commercialUsePrice);
+        licenseTermsData.push({
+          terms: PILFlavor.commercialUse({
+            defaultMintingFee: BigInt(price),
+            currency: WIP_TOKEN_ADDRESS,
+            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
+          }),
+        });
+      }
+
+      if (selected.includes("COMMERCIAL_REMIX")) {
+        const price = Number(commercialRemixPrice);
+        const share = Number(commercialRemixShare);
+        licenseTermsData.push({
+          terms: PILFlavor.commercialRemix({
+            defaultMintingFee: BigInt(price),
+            commercialRevShare: share,
+            currency: WIP_TOKEN_ADDRESS,
+            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
+          }),
+          maxLicenseTokens: 100,
+        });
+      }
+
+      // NON_COMMERCIAL_REMIX는 Story Protocol SDK에서 직접 지원하지 않으므로
+      // creativeCommonsAttribution을 사용하거나 제외
+      if (selected.includes("NON_COMMERCIAL_REMIX")) {
+        licenseTermsData.push({
+          terms: PILFlavor.creativeCommonsAttribution({
+            currency: WIP_TOKEN_ADDRESS,
+            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
+          }),
+        });
+      }
+
+      // SPG NFT 컨트랙트 주소 (예제 값, 실제로는 동적으로 생성하거나 설정 필요)
+      const spgNftContract = "0xc32A8a0FF3beDDDa58393d022aF433e78739FAbc";
+
+      // IP 메타데이터 (실제로는 IPFS에 업로드한 후 URL 사용)
+      const ipMetadata = {
+        ipMetadataURI:
+          "https://ipfs.io/ipfs/bafkreiardkgvkejqnnkdqp4pamkx2e5bs4lzus5trrw3hgmoa7dlbb6foe",
+        ipMetadataHash: toHex("test-metadata-hash", { size: 32 }),
+        nftMetadataURI:
+          "https://ipfs.io/ipfs/bafkreicexrvs2fqvwblmgl3gnwiwh76pfycvfs66ck7w4s5omluyhti2kq",
+        nftMetadataHash: toHex("test-nft-metadata-hash", { size: 32 }),
       };
-    }
 
-    if (selected.includes("COMMERCIAL_REMIX")) {
-      result.commercialRemix = {
-        priceIp: Number(commercialRemixPrice),
-        revenueSharePct: Number(commercialRemixShare),
+      // registerIpAsset 호출
+      const response = await client.ipAsset.registerIpAsset({
+        nft: { type: "mint", spgNftContract: spgNftContract },
+        licenseTermsData: licenseTermsData,
+        royaltyShares: [
+          {
+            recipient: "0xb05ff66a7eac8a6e600d83fbdb8c3c1f208fa59e", // 실제 수신자 주소로 변경 필요
+            percentage: 10,
+          },
+        ],
+        ipMetadata: ipMetadata,
+      });
+
+      console.log(
+        `Root IPA created at transaction hash ${response.txHash}, IPA ID: ${response.ipId}`
+      );
+
+      // 성공 후 결과 전달
+      const result: LicenseSelectionResult = {
+        licenses: selected,
       };
-    }
 
-    onConfirm(result);
-    resetState();
-    navigate("/");
+      if (selected.includes("COMMERCIAL_USE")) {
+        result.commercialUse = {
+          priceIp: Number(commercialUsePrice),
+          revenueSharePct: Number(commercialUseShare),
+        };
+      }
+
+      if (selected.includes("COMMERCIAL_REMIX")) {
+        result.commercialRemix = {
+          priceIp: Number(commercialRemixPrice),
+          revenueSharePct: Number(commercialRemixShare),
+        };
+      }
+
+      onConfirm(result);
+      resetState();
+      navigate("/");
+    } catch (error) {
+      console.error("IP Asset 등록 중 오류 발생:", error);
+      alert(
+        `IP Asset 등록 실패: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
   };
 
   const isReviewStep = step === 3;
