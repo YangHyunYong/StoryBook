@@ -1,16 +1,9 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../supabaseClient";
+import { generateId, getUserIdFromHeader } from "../utils";
 
 const router = Router();
 const TABLE = "users";
-
-function generateId(): string {
-  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function getUserIdFromHeader(req: Request): string {
-  return String(req.header("x-user-id") ?? "").trim();
-}
 
 // GET by id from header
 router.get("/", async (req: Request, res: Response) => {

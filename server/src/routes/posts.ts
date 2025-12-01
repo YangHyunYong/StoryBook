@@ -1,12 +1,9 @@
 import { Router, Request, Response } from "express";
 import { supabase, PostRecord } from "../supabaseClient";
+import { generateId, getUserIdFromHeader } from "../utils";
 
 const router = Router();
 const TABLE = "posts";
-
-function generateId(): string {
-  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
 
 router.get("/", async (req: Request, res: Response) => {
   const limit = Number(req.query.limit ?? 50);
@@ -103,16 +100,12 @@ router.post("/", async (req: Request, res: Response) => {
 
 // legacy delta reposts route removed (use PUT/DELETE /posts/reposts or POST /posts/reposts)
 
-function getUserId(req: Request): string {
-  return String(req.header("x-user-id") ?? "").trim();
-}
-
 // User-scoped interactions now supported via POST toggle endpoints only
 
 // Toggle like: first tap -> like, second tap -> unlike
 router.post("/:id/likes", async (req: Request, res: Response) => {
   const id = req.params.id;
-  const userId = getUserId(req);
+  const userId = getUserIdFromHeader(req);
   if (!userId) {
     return res.status(400).json({ error: "x-user-id header is required" });
   }
@@ -204,7 +197,7 @@ router.post("/:id/likes", async (req: Request, res: Response) => {
 // Toggle repost: first tap -> repost, second tap -> unrepost
 router.post("/:id/reposts", async (req: Request, res: Response) => {
   const id = req.params.id;
-  const userId = getUserId(req);
+  const userId = getUserIdFromHeader(req);
   if (!userId) {
     return res.status(400).json({ error: "x-user-id header is required" });
   }
