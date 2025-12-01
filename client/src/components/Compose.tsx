@@ -1,14 +1,20 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { LicenseSelectionModal } from "./LicenseSelectModal";
+import type { LicenseSelectionResult } from "../types/license";
 
 export function Compose() {
   const [content, setContent] = useState("");
-  const navigate = useNavigate();
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
 
-  const handlePost = () => {
+  const handleClickPost = () => {
     if (!content.trim()) return;
-    console.log("Posting:", content);
-    navigate("/");
+    setIsLicenseModalOpen(true);
+  };
+
+  const handleConfirmLicenses = (result: LicenseSelectionResult) => {
+    setIsLicenseModalOpen(false);
+    console.log("post content:", content);
+    console.log("license config:", result);
   };
 
   return (
@@ -16,44 +22,32 @@ export function Compose() {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold">New Post</h2>
         <button
-          className="
-            px-4 py-2 
-            rounded-full 
-            text-sm font-medium 
-            text-black
-            btn-ip-yellow
-            hover:brightness-110
-            active:brightness-95
-            transition
-            disabled:opacity-40
-            disabled:cursor-not-allowed
-            disabled:hover:brightness-100
-            disabled:active:brightness-100
-          "
+          onClick={handleClickPost}
           disabled={!content.trim()}
-          onClick={handlePost}
+          className={`
+            px-4 py-2 rounded-full text-sm font-medium text-black
+            btn-ip-yellow
+            hover:brightness-110 active:brightness-95
+            transition
+            disabled:opacity-40 disabled:cursor-not-allowed
+          `}
         >
           Post
         </button>
       </div>
       <textarea
-        className="
-          w-full 
-          min-h-40 
-          rounded-xl 
-          bg-black 
-          border border-gray-700 
-          p-3 
-          text-sm 
-          resize-none 
-          focus:outline-none 
-          focus:border-sky-500
-        "
+        className="w-full min-h-40 rounded-xl bg-black border border-gray-700 p-3 text-sm resize-none focus:outline-none focus:border-sky-500"
         placeholder="What's happening?"
         value={content}
         onChange={(e) => setContent(e.target.value)}
       />
-      <div className="flex justify-end"></div>
+
+      <LicenseSelectionModal
+        isOpen={isLicenseModalOpen}
+        postText={content}
+        onClose={() => setIsLicenseModalOpen(false)}
+        onConfirm={handleConfirmLicenses}
+      />
     </div>
   );
 }
