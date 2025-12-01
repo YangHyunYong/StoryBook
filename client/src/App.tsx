@@ -9,16 +9,16 @@ import { PostDetail } from "./components/PostDetail";
 import { ProfileSetupModal } from "./components/ProfileSetupModal";
 import type { UserProfile } from "./types/user";
 
-const STORY_CHAIN_ID_HEX = "0x5E9"; // 1513
+const STORY_CHAIN_ID_HEX = "0x523"; // 1315
 const STORY_TESTNET_PARAMS = {
   chainId: STORY_CHAIN_ID_HEX,
-  chainName: "Story Testnet",
+  chainName: "Story Aeneid Testnet",
   nativeCurrency: {
     name: "IP",
     symbol: "IP",
     decimals: 18,
   },
-  rpcUrls: ["https://testnet.storyrpc.io"],
+  rpcUrls: ["https://aeneid.storyrpc.io"],
   blockExplorerUrls: ["https://testnet.storyscan.app"],
 };
 
