@@ -10,10 +10,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (req: Request, res: Response) => {
-  res.json({ message: "TypeScript Node server is running" });
-});
-
 app.use("/posts", postsRouter);
 app.use("/users", usersRouter);
 
