@@ -24,7 +24,7 @@ export const stories: StoryBook[] = [
       "Qui labore repellendus et omnis atque et quisquam deserunt ut tempore suscipit?",
       "Sed odit consequuntur sit consectetur totam et quia dolorum id voluptates incidunt ea rerum earum et corporis consequatur.",
     ].join("\n\n"),
-    imageUrl: "../public/mocks/image1.png",
+    imageUrl: "/mocks/image1.png",
     timestamp: now - 2 * 60 * 60 * 1000,
   },
   {
@@ -37,7 +37,7 @@ export const stories: StoryBook[] = [
       "Et voluptatem omnis quo commodi voluptas ut dolorum voluptas ad maiores sint est laboriosam pariatur eum sequi praesentium et voluptatum eligendi.",
       "Et labore expedita est accusantium voluptatibus ex deserunt totam in aliquid commodi aut dolores deserunt.",
     ].join("\n\n"),
-    imageUrl: "../public/mocks/image2.png",
+    imageUrl: "/mocks/image2.png",
     timestamp: now - 4 * 60 * 60 * 1000,
   },
 
@@ -51,7 +51,7 @@ export const stories: StoryBook[] = [
       "Aut velit mollitia non consequatur vitae et quia quia eos veritatis pariatur aut sint soluta 33 molestiae voluptas ut voluptatibus dolorum.",
       "Id rerum odio est nulla galisum qui quia deleniti nam pariatur exercitationem sit recusandae mollitia?",
     ].join("\n\n"),
-    imageUrl: "../public/mocks/image3.png",
+    imageUrl: "/mocks/image3.png",
     timestamp: now - 5 * 60 * 60 * 1000,
   },
   {
@@ -64,7 +64,7 @@ export const stories: StoryBook[] = [
       "Sit nihil voluptates et possimus quod sed quod quia sed distinctio nulla ab accusantium voluptatem eos beatae quis.",
       "Et quae dolorem quo corporis repudiandae hic fuga suscipit.",
     ].join("\n\n"),
-    imageUrl: "../public/mocks/image4.png",
+    imageUrl: "/mocks/image4.png",
     timestamp: now - 6 * 60 * 60 * 1000,
   },
 
@@ -78,7 +78,7 @@ export const stories: StoryBook[] = [
       "Et accusantium itaque et modi galisum eos sunt dolorum. Qui corporis magni hic excepturi eius aut nihil debitis et ullam deleniti non galisum voluptas qui perspiciatis ipsum.",
       "Et illo quae ea repellendus unde et quae eaque aut cumque similique.",
     ].join("\n\n"),
-    imageUrl: "../public/mocks/image5.png",
+    imageUrl: "/mocks/image5.png",
     timestamp: now - 7 * 60 * 60 * 1000,
   },
 ];
