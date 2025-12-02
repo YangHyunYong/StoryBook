@@ -12,7 +12,10 @@ type LocationState = {
 export function StoryWriter() {
   const location = useLocation();
   const navigate = useNavigate();
-  const params = useParams<{ id: string }>();
+  const params = useParams<{ id?: string }>();
+
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
 
   const state = location.state as LocationState | null;
@@ -23,14 +26,14 @@ export function StoryWriter() {
     parent = findStoryById(parentIdParam);
   }
 
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const hasParentContext = state?.parent != null || parentIdParam != null;
+  const isRoot = !parent && !hasParentContext;
 
-  if (!parent) {
+  if (!parent && hasParentContext && parentIdParam != null) {
     return (
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="text-center text-sm text-zinc-400">
-          <p>Could not find a Story to derive from.</p>
+          <p>Could not find the Story to derive from.</p>
           <button
             onClick={() => navigate("/")}
             className="mt-4 rounded-full border border-zinc-700 px-4 py-1.5 text-xs text-zinc-100 hover:bg-zinc-800"
@@ -44,18 +47,26 @@ export function StoryWriter() {
 
   const handleConfirmLicenses = (result: LicenseSelectionResult) => {
     setIsLicenseModalOpen(false);
-    console.log("post content:", content);
+    console.log(isRoot ? "new root story" : "new derivative story", {
+      parentId: parent?.id ?? null,
+      title,
+      content,
+    });
     console.log("license config:", result);
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim() || !title.trim()) return;
     setIsLicenseModalOpen(true);
   };
 
   const handleCancel = () => {
-    navigate(-1);
+    if (isRoot) {
+      navigate("/");
+    } else {
+      navigate(-1);
+    }
   };
 
   return (
@@ -76,17 +87,25 @@ export function StoryWriter() {
                   <div className="mb-2 flex items-center justify-between">
                     <div className="flex flex-col text-[10px] text-zinc-400">
                       <span className="uppercase tracking-[0.2em]">
-                        Writing Derivative
+                        {isRoot
+                          ? "Writing Original Story"
+                          : "Writing Derivative"}
                       </span>
-                      <span className="max-w-[260px] truncate text-xs text-zinc-200">
-                        of {parent.title}
-                      </span>
+                      {!isRoot && parent && (
+                        <span className="max-w-[260px] truncate text-xs text-zinc-200">
+                          of {parent.title}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="relative mb-4 flex items-center justify-between text-[10px] text-zinc-500 md:mb-5 md:text-[11px]">
-                    <span className="tracking-wide">Write Next</span>
+                    <span className="tracking-wide">
+                      {isRoot ? "Write Original" : "Write Next"}
+                    </span>
                     <span className="truncate max-w-[65%] text-right text-zinc-400">
-                      {parent.title}
+                      {isRoot
+                        ? title || "New Story"
+                        : parent?.title ?? "Derived from"}
                     </span>
                   </div>
                   <div className="relative mb-4 h-px w-full bg-linear-to-r from-zinc-700 via-zinc-800 to-zinc-700" />
@@ -105,7 +124,11 @@ export function StoryWriter() {
                           value={title}
                           onChange={(e) => setTitle(e.target.value)}
                           className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[#fde68a]"
-                          placeholder="Enter the title of your derivative story"
+                          placeholder={
+                            isRoot
+                              ? "Enter the title of your story"
+                              : "Enter the title of your derivative story"
+                          }
                         />
                       </div>
                       <div className="flex-1 flex flex-col">
@@ -116,7 +139,11 @@ export function StoryWriter() {
                           value={content}
                           onChange={(e) => setContent(e.target.value)}
                           className="min-h-[220px] flex-1 resize-none rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[#fde68a]"
-                          placeholder="Write your derivative story here"
+                          placeholder={
+                            isRoot
+                              ? "Write your story here"
+                              : "Write your derivative story here"
+                          }
                         />
                       </div>
                     </form>

@@ -27,6 +27,7 @@ const STORY_TESTNET_PARAMS = {
 function App() {
   const location = useLocation();
   const isStoryPage = location.pathname.startsWith("/story");
+  const isWritePage = location.pathname.startsWith("/write");
 
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -130,10 +131,13 @@ function App() {
             }
           />
           <Route path="/story/:id" element={<StoryReader />} />
+          <Route path="/write" element={<StoryWriter />} />
           <Route path="/story/:id/write" element={<StoryWriter />} />
         </Routes>
       </main>
-      {!isStoryPage && isWalletConnected && <FloatingWriteButton />}
+      {!isStoryPage && !isWritePage && isWalletConnected && (
+        <FloatingWriteButton />
+      )}
       <ProfileSetupModal
         isOpen={isProfileModalOpen}
         address={pendingAddress}
