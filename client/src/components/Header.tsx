@@ -41,7 +41,7 @@ export function Header({ profile }: HeaderProps) {
             )}
           </Link>
         )}
-        <h3 className="text-white">Story X DSRV</h3>
+        <h3 className="text-white">Story Book</h3>
         <div className="w-7 h-7" />
       </div>
     </header>

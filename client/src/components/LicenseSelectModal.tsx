@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createStoryClient } from "../utils/storyClient";
+import { PILFlavor, WIP_TOKEN_ADDRESS } from "@story-protocol/core-sdk";
+import { toHex } from "viem";
 import type { LicenseType, LicenseSelectionResult } from "../types/license";
 
 interface LicenseSelectionModalProps {
   isOpen: boolean;
+  postTitle: string;
   postText: string;
   onClose: () => void;
   onConfirm: (result: LicenseSelectionResult) => void;
@@ -44,12 +48,14 @@ const LICENSE_OPTIONS: {
 
 export function LicenseSelectionModal({
   isOpen,
+  postTitle,
   postText,
   onClose,
   onConfirm,
 }: LicenseSelectionModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selected, setSelected] = useState<LicenseType[]>([]);
+  const [isPosting, setIsPosting] = useState(false);
   const navigate = useNavigate();
 
   const [commercialUsePrice, setCommercialUsePrice] = useState("");
@@ -127,28 +133,122 @@ export function LicenseSelectionModal({
     setStep(3);
   };
 
-  const handlePost = () => {
-    const result: LicenseSelectionResult = {
-      licenses: selected,
-    };
+  const handlePost = async () => {
+    try {
+      setIsPosting(true);
+      // Story Protocol 클라이언트 생성
+      const client = await createStoryClient();
 
-    if (selected.includes("COMMERCIAL_USE")) {
-      result.commercialUse = {
-        priceIp: Number(commercialUsePrice),
-        revenueSharePct: Number(commercialUseShare),
+      // 라이선스 텀 데이터 생성
+      const licenseTermsData = [];
+
+      if (selected.includes("OPEN_USE")) {
+        licenseTermsData.push({
+          terms: PILFlavor.creativeCommonsAttribution({
+            currency: WIP_TOKEN_ADDRESS,
+            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
+          }),
+        });
+      }
+
+      if (selected.includes("COMMERCIAL_USE")) {
+        const price = Number(commercialUsePrice);
+        licenseTermsData.push({
+          terms: PILFlavor.commercialUse({
+            defaultMintingFee: BigInt(price),
+            currency: WIP_TOKEN_ADDRESS,
+            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
+          }),
+        });
+      }
+
+      if (selected.includes("COMMERCIAL_REMIX")) {
+        const price = Number(commercialRemixPrice);
+        const share = Number(commercialRemixShare);
+        licenseTermsData.push({
+          terms: PILFlavor.commercialRemix({
+            defaultMintingFee: BigInt(price),
+            commercialRevShare: share,
+            currency: WIP_TOKEN_ADDRESS,
+            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
+          }),
+          maxLicenseTokens: 100,
+        });
+      }
+
+      // NON_COMMERCIAL_REMIX는 Story Protocol SDK에서 직접 지원하지 않으므로
+      // creativeCommonsAttribution을 사용하거나 제외
+      if (selected.includes("NON_COMMERCIAL_REMIX")) {
+        licenseTermsData.push({
+          terms: PILFlavor.creativeCommonsAttribution({
+            currency: WIP_TOKEN_ADDRESS,
+            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
+          }),
+        });
+      }
+
+      // SPG NFT 컨트랙트 주소 (예제 값, 실제로는 동적으로 생성하거나 설정 필요)
+      const spgNftContract = "0xc32A8a0FF3beDDDa58393d022aF433e78739FAbc";
+
+      // IP 메타데이터 (실제로는 IPFS에 업로드한 후 URL 사용)
+      const ipMetadata = {
+        ipMetadataURI:
+          "https://ipfs.io/ipfs/bafkreiardkgvkejqnnkdqp4pamkx2e5bs4lzus5trrw3hgmoa7dlbb6foe",
+        ipMetadataHash: toHex("test-metadata-hash", { size: 32 }),
+        nftMetadataURI:
+          "https://ipfs.io/ipfs/bafkreicexrvs2fqvwblmgl3gnwiwh76pfycvfs66ck7w4s5omluyhti2kq",
+        nftMetadataHash: toHex("test-nft-metadata-hash", { size: 32 }),
       };
-    }
 
-    if (selected.includes("COMMERCIAL_REMIX")) {
-      result.commercialRemix = {
-        priceIp: Number(commercialRemixPrice),
-        revenueSharePct: Number(commercialRemixShare),
+      // registerIpAsset 호출
+      const response = await client.ipAsset.registerIpAsset({
+        nft: { type: "mint", spgNftContract: spgNftContract },
+        licenseTermsData: licenseTermsData,
+        royaltyShares: [
+          {
+            recipient: "0xb05ff66a7eac8a6e600d83fbdb8c3c1f208fa59e", // 실제 수신자 주소로 변경 필요
+            percentage: 10,
+          },
+        ],
+        ipMetadata: ipMetadata,
+      });
+
+      console.log(
+        `Root IPA created at transaction hash ${response.txHash}, IPA ID: ${response.ipId}`
+      );
+
+      // 성공 후 결과 전달
+      const result: LicenseSelectionResult = {
+        licenses: selected,
       };
-    }
 
-    onConfirm(result);
-    resetState();
-    navigate("/");
+      if (selected.includes("COMMERCIAL_USE")) {
+        result.commercialUse = {
+          priceIp: Number(commercialUsePrice),
+          revenueSharePct: Number(commercialUseShare),
+        };
+      }
+
+      if (selected.includes("COMMERCIAL_REMIX")) {
+        result.commercialRemix = {
+          priceIp: Number(commercialRemixPrice),
+          revenueSharePct: Number(commercialRemixShare),
+        };
+      }
+
+      onConfirm(result);
+      resetState();
+      navigate("/");
+    } catch (error) {
+      console.error("IP Asset 등록 중 오류 발생:", error);
+      alert(
+        `IP Asset 등록 실패: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   const isReviewStep = step === 3;
@@ -167,6 +267,7 @@ export function LicenseSelectionModal({
             className="px-2 py-1 rounded-full text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
             onClick={handleClose}
             aria-label="Close"
+            disabled={isPosting}
           >
             X
           </button>
@@ -223,7 +324,6 @@ export function LicenseSelectionModal({
               single use only. Buyers will need to purchase a new license for
               each additional use.
             </p>
-
             {selected.includes("COMMERCIAL_USE") && (
               <div className="space-y-2 border border-gray-800 rounded-xl p-3">
                 <h3 className="text-sm font-semibold mb-1">
@@ -332,7 +432,13 @@ export function LicenseSelectionModal({
               Here’s an overview of your registration.
             </p>
             <div className="space-y-1 border border-gray-800 rounded-xl p-3">
-              <div className="text-[11px] text-gray-400 mb-1">Your post</div>
+              <div className="text-[11px] text-gray-400 mb-1">Title</div>
+              <p className="text-sm text-gray-100 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                {postTitle}
+              </p>
+            </div>
+            <div className="space-y-1 border border-gray-800 rounded-xl p-3">
+              <div className="text-[11px] text-gray-400 mb-1">Content</div>
               <p className="text-sm text-gray-100 whitespace-pre-wrap max-h-32 overflow-y-auto">
                 {postText}
               </p>
@@ -355,7 +461,12 @@ export function LicenseSelectionModal({
             </div>
             <div className="flex justify-between pt-2">
               <button
-                className="px-3 py-1.5 rounded-full text-xs text-gray-300 border border-gray-700 hover:bg-gray-800 transition-colors"
+                className="
+                  px-3 py-1.5 rounded-full text-xs text-gray-300 
+                  border border-gray-700 hover:bg-gray-800 
+                  transition-colors
+                  disabled:opacity-40 disabled:cursor-not-allowed
+                "
                 onClick={() => {
                   if (hasCommercialSelected) {
                     setStep(2);
@@ -363,6 +474,7 @@ export function LicenseSelectionModal({
                     setStep(1);
                   }
                 }}
+                disabled={isPosting}
               >
                 Back
               </button>
@@ -373,10 +485,14 @@ export function LicenseSelectionModal({
                     btn-ip-yellow
                     hover:brightness-110 active:brightness-95
                     transition
+                    disabled:opacity-40 disabled:cursor-not-allowed
                   "
                   onClick={handlePost}
+                  disabled={isPosting}
                 >
-                  Get some $IP to Register
+                  <span>
+                    {isPosting ? "Registering..." : "Get some $IP to Register"}
+                  </span>
                 </button>
               </div>
             </div>
