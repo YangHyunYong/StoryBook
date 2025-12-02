@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 // app.use("/posts", postsRouter);
-// app.use("/users", usersRouter);
+// app.use("/users", usersRouter); 
 app.use("/stability", stabilityRouter);
 
 export { app };

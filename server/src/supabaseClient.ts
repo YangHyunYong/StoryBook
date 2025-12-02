@@ -12,7 +12,7 @@ dotenv.config();
 //   );
 //   // Fail fast to avoid creating client with invalid config
 //   process.exit(1);
-// }
+// } 
 
 // export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
 //   auth: {
@@ -21,7 +21,7 @@ dotenv.config();
 //   },
 // });
 
-// Supabase 사용 안 함 - 주석처리
+// Supabase 사용 안 함 - 주석 해제 시 삭제
 export const supabase: any = null;
 
 export type PostRecord = {
