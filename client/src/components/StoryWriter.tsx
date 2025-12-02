@@ -17,6 +17,8 @@ export function StoryWriter() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const state = location.state as LocationState | null;
   const parentIdParam = params.id ? Number(params.id) : undefined;
@@ -55,9 +57,38 @@ export function StoryWriter() {
     console.log("license config:", result);
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!content.trim() || !title.trim()) return;
+
+    try {
+      setIsGeneratingImage(true);
+
+      const response = await fetch("/api/stability/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt: content }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Failed to generate image:", errorText);
+      } else {
+        const data = await response.json();
+        if (data.imageUrl) {
+          setImageUrl(data.imageUrl);
+          console.log("Generated image URL:", data.imageUrl);
+        }
+      }
+    } catch (error) {
+      console.error("Error calling /api/stability/generate:", error);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+
+    // After image generation request, open the license selection modal
     setIsLicenseModalOpen(true);
   };
 
@@ -147,6 +178,11 @@ export function StoryWriter() {
                         />
                       </div>
                     </form>
+                    {imageUrl && (
+                      <div className="mb-1 text-[10px] text-zinc-400">
+                        Story illustration generated.
+                      </div>
+                    )}
                     <div className="mt-2 flex items-center justify-between">
                       <button
                         type="button"
@@ -158,7 +194,9 @@ export function StoryWriter() {
                       <button
                         type="submit"
                         form="story-writer-form"
-                        disabled={!title.trim() || !content.trim()}
+                        disabled={
+                          !title.trim() || !content.trim() || isGeneratingImage
+                        }
                         className="
                           px-4 py-1.5 rounded-full text-xs font-medium text-black
                           btn-ip-yellow
@@ -167,7 +205,9 @@ export function StoryWriter() {
                           disabled:opacity-40 disabled:cursor-not-allowed
                         "
                       >
-                        <span className="sm:inline">Register</span>
+                        <span className="sm:inline">
+                          {isGeneratingImage ? "Generating..." : "Register"}
+                        </span>
                       </button>
                     </div>
                   </div>
