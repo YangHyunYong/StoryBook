@@ -1,9 +1,13 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useState, type FormEvent } from "react";
+import axios from "axios";
 import { findStoryById } from "../utils/story";
 import { LicenseSelectionModal } from "./LicenseSelectModal";
 import type { StoryBook } from "../types/story";
 import type { LicenseSelectionResult } from "../types/license";
+
+// API 기본 URL 설정 (환경 변수 또는 기본값)
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 type LocationState = {
   parent?: StoryBook;
@@ -64,32 +68,36 @@ export function StoryWriter() {
     try {
       setIsGeneratingImage(true);
 
-      const response = await fetch("/api/stability/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt: content }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Failed to generate image:", errorText);
-      } else {
-        const data = await response.json();
-        if (data.imageUrl) {
-          setImageUrl(data.imageUrl);
-          console.log("Generated image URL:", data.imageUrl);
+      const response = await axios.post(
+        `${API_BASE_URL}/stability/generate`,
+        { prompt: content },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
+      );
+
+      if (response.data?.imageUrl) {
+        setImageUrl(response.data.imageUrl);
+
+        // IPFS에 업로드할 이미지 URL
+        console.log(response.data.imageUrl);
       }
     } catch (error) {
-      console.error("Error calling /api/stability/generate:", error);
+      if (axios.isAxiosError(error)) {
+        console.error(
+          "Failed to generate image:",
+          error.response?.data || error.message
+        );
+      } else {
+        console.error("Error calling stability API:", error);
+      }
     } finally {
       setIsGeneratingImage(false);
+      // After image generation request, open the license selection modal
+      setIsLicenseModalOpen(true);
     }
-
-    // After image generation request, open the license selection modal
-    setIsLicenseModalOpen(true);
   };
 
   const handleCancel = () => {
