@@ -23,10 +23,11 @@ router.post("/generate", async (req: Request, res: Response) => {
 
     // payload 객체 생성
     const payload = {
-      prompt: prompt,
-      aspect_ratio: "3:4",
+      prompt,
+      aspect_ratio: "4:5",
       output_format: "jpeg",
-      model: "sd3",
+      model: "sd3-medium",
+      style_preset: "pixel-art"
     };
 
     // axios.postForm과 axios.toFormData를 사용하여 FormData 생성 및 전송
