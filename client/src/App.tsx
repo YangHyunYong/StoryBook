@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { Feed } from "./components/Feed";
 import { Header } from "./components/Header";
 import { User } from "./components/User";
-import { Compose } from "./components/Compose";
 import { FloatingWriteButton } from "./components/FloatingWriteButton";
-import { useState } from "react";
-import { PostDetail } from "./components/PostDetail";
 import { ProfileSetupModal } from "./components/ProfileSetupModal";
+
+import { StoryShelf } from "./components/StoryShelf";
+import { StoryReader } from "./components/StoryReader";
+import { StoryWriter } from "./components/StoryWriter";
+
 import type { UserProfile } from "./types/user";
 
 const STORY_CHAIN_ID_HEX = "0x523"; // 1315
@@ -24,7 +26,7 @@ const STORY_TESTNET_PARAMS = {
 
 function App() {
   const location = useLocation();
-  const isComposePage = location.pathname.startsWith("/compose");
+  const isStoryPage = location.pathname.startsWith("/story");
 
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -115,7 +117,7 @@ function App() {
       <Header profile={userProfile} />
       <main className="flex-1 w-full max-w-full mx-auto overflow-y-auto">
         <Routes>
-          <Route path="/" element={<Feed />} />
+          <Route path="/" element={<StoryShelf />} />
           <Route
             path="/user"
             element={
@@ -127,11 +129,11 @@ function App() {
               />
             }
           />
-          <Route path="/compose" element={<Compose />} />
-          <Route path="/post/:id" element={<PostDetail />} />
+          <Route path="/story/:id" element={<StoryReader />} />
+          <Route path="/story/:id/write" element={<StoryWriter />} />
         </Routes>
       </main>
-      {!isComposePage && isWalletConnected && <FloatingWriteButton />}
+      {!isStoryPage && isWalletConnected && <FloatingWriteButton />}
       <ProfileSetupModal
         isOpen={isProfileModalOpen}
         address={pendingAddress}
