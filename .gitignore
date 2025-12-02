@@ -5,6 +5,9 @@ dist/
 .idea/
 .DS_Store/
 
+# Environment variables (루트 및 모든 하위 폴더)
+**/.env
+**/.env.local
 .env
 
 sql/
