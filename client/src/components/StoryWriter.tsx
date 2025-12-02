@@ -83,22 +83,23 @@ export function StoryWriter({ profile }: StoryWriterProps) {
     try {
       setIsGeneratingImage(true);
 
-      const response = await axios.post(
-        `${API_BASE_URL}/stability/generate`,
-        { prompt: content },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      // 이미지 생성 API 호출 주석 처리
+      // const response = await axios.post(
+      //   `${API_BASE_URL}/stability/generate`,
+      //   { prompt: content },
+      //   {
+      //     headers: {
+      //       "Content-Type": "application/json",
+      //     },
+      //   }
+      // );
 
-      if (response.data?.imageUrl) {
-        setImageUrl(response.data.imageUrl);
+      // if (response.data?.imageUrl) {
+      //   setImageUrl(response.data.imageUrl);
 
-        // IPFS에 업로드할 이미지 URL
-        console.log(response.data.imageUrl);
-      }
+      //   // IPFS에 업로드할 이미지 URL
+      //   console.log(response.data.imageUrl);
+      // }
     } catch (error) {
       if (axios.isAxiosError(error)) {
         console.error(
@@ -247,6 +248,7 @@ export function StoryWriter({ profile }: StoryWriterProps) {
         onClose={() => setIsLicenseModalOpen(false)}
         onConfirm={handleConfirmLicenses}
         profile={profile}
+        isRoot={isRoot}
       />
     </div>
   );
