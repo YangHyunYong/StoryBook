@@ -5,6 +5,7 @@ import { findStoryById } from "../utils/story";
 import { LicenseSelectionModal } from "./LicenseSelectModal";
 import type { StoryBook } from "../types/story";
 import type { LicenseSelectionResult } from "../types/license";
+import type { UserProfile } from "../types/user";
 
 // API 기본 URL 설정 (환경 변수 또는 기본값)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -13,7 +14,11 @@ type LocationState = {
   parent?: StoryBook;
 };
 
-export function StoryWriter() {
+interface StoryWriterProps {
+  profile: UserProfile | null;
+}
+
+export function StoryWriter({ profile }: StoryWriterProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams<{ id?: string }>();
@@ -34,6 +39,16 @@ export function StoryWriter() {
 
   const hasParentContext = state?.parent != null || parentIdParam != null;
   const isRoot = !parent && !hasParentContext;
+
+  if (!profile) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="text-center text-sm text-zinc-400">
+          <p>You need to connect your wallet and set up your profile first.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!parent && hasParentContext && parentIdParam != null) {
     return (
@@ -231,6 +246,7 @@ export function StoryWriter() {
         postText={content}
         onClose={() => setIsLicenseModalOpen(false)}
         onConfirm={handleConfirmLicenses}
+        profile={profile}
       />
     </div>
   );
