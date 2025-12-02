@@ -10,6 +10,7 @@ import { StoryReader } from "./components/StoryReader";
 import { StoryWriter } from "./components/StoryWriter";
 
 import type { UserProfile } from "./types/user";
+import type { Address } from "viem";
 
 const STORY_CHAIN_ID_HEX = "0x523"; // 1315
 const STORY_TESTNET_PARAMS = {
@@ -32,7 +33,7 @@ function App() {
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
-  const [pendingAddress, setPendingAddress] = useState<string | null>(null);
+  const [pendingAddress, setPendingAddress] = useState<Address | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const handleConnectWallet = async () => {
@@ -62,7 +63,7 @@ function App() {
 
       if (!accounts || accounts.length === 0) return;
 
-      const selected = accounts[0];
+      const selected = accounts[0] as Address;
       const message = [
         "Sign in to Story Feed",
         `Address: ${selected}`,
@@ -131,8 +132,14 @@ function App() {
             }
           />
           <Route path="/story/:id" element={<StoryReader />} />
-          <Route path="/write" element={<StoryWriter />} />
-          <Route path="/story/:id/write" element={<StoryWriter />} />
+          <Route
+            path="/write"
+            element={<StoryWriter profile={userProfile} />}
+          />
+          <Route
+            path="/story/:id/write"
+            element={<StoryWriter profile={userProfile} />}
+          />
         </Routes>
       </main>
       {!isStoryPage && !isWritePage && isWalletConnected && (
