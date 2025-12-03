@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { registerIpAsset } from "../services/story/registerIpAsset";
-import { createStoryClient } from "../utils/storyClient";
-import { PILFlavor, WIP_TOKEN_ADDRESS } from "@story-protocol/core-sdk";
-import { toHex } from "viem";
+import {
+  registerDerivativeIpAsset,
+  registerIpAsset,
+} from "../services/story/registerIpAsset";
 import { generateAndPinImage } from "../services/story/generateAndPinImage";
 
 import type { IpMetadata } from "@story-protocol/core-sdk";
@@ -174,166 +174,38 @@ export function LicenseSelectionModal({
         image: ipfsUrl,
       };
 
-      await registerIpAsset({
-        ipMetadata,
-        nftMetadata,
-        licenses: selected,
-        commercialUseConfig: selected.includes("COMMERCIAL_USE")
-          ? { priceIp: Number(commercialUsePrice) }
-          : undefined,
-        commercialRemixConfig: selected.includes("COMMERCIAL_REMIX")
-          ? {
-              priceIp: Number(commercialRemixPrice),
-              revenueSharePct: Number(commercialRemixShare),
-            }
-          : undefined,
-      });
-
-      /////////////////////////////////////////////////////////////
-      /////////////////////////////////////////////////////////////
-      // Story Protocol 클라이언트 생성
-      const client = await createStoryClient();
-
-      // 라이선스 텀 데이터 생성
-      const licenseTermsData = [];
-
-      if (selected.includes("OPEN_USE")) {
-        licenseTermsData.push({
-          terms: PILFlavor.creativeCommonsAttribution({
-            currency: WIP_TOKEN_ADDRESS,
-            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
-          }),
-        });
-      }
-
-      if (selected.includes("COMMERCIAL_USE")) {
-        const price = Number(commercialUsePrice);
-        licenseTermsData.push({
-          terms: PILFlavor.commercialUse({
-            defaultMintingFee: BigInt(price),
-            currency: WIP_TOKEN_ADDRESS,
-            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
-          }),
-        });
-      }
-
-      if (selected.includes("COMMERCIAL_REMIX")) {
-        const price = Number(commercialRemixPrice);
-        const share = Number(commercialRemixShare);
-        licenseTermsData.push({
-          terms: PILFlavor.commercialRemix({
-            defaultMintingFee: BigInt(price),
-            commercialRevShare: share,
-            currency: WIP_TOKEN_ADDRESS,
-            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
-          }),
-          maxLicenseTokens: 100,
-        });
-      }
-
-      // NON_COMMERCIAL_REMIX는 Story Protocol SDK에서 직접 지원하지 않으므로
-      // creativeCommonsAttribution을 사용하거나 제외
-      if (selected.includes("NON_COMMERCIAL_REMIX")) {
-        licenseTermsData.push({
-          terms: PILFlavor.creativeCommonsAttribution({
-            currency: WIP_TOKEN_ADDRESS,
-            royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
-          }),
-        });
-      }
-
-      // SPG NFT 컨트랙트 주소 (예제 값, 실제로는 동적으로 생성하거나 설정 필요)
-      const spgNftContract = "0xc32A8a0FF3beDDDa58393d022aF433e78739FAbc";
-
-      // IP 메타데이터 (실제로는 IPFS에 업로드한 후 URL 사용)
-      const metadata = {
-        ipMetadataURI:
-          "https://ipfs.io/ipfs/bafkreiardkgvkejqnnkdqp4pamkx2e5bs4lzus5trrw3hgmoa7dlbb6foe",
-        ipMetadataHash: toHex("test-metadata-hash", { size: 32 }),
-        nftMetadataURI:
-          "https://ipfs.io/ipfs/bafkreicexrvs2fqvwblmgl3gnwiwh76pfycvfs66ck7w4s5omluyhti2kq",
-        nftMetadataHash: toHex("test-nft-metadata-hash", { size: 32 }),
-      };
+      let result: LicenseSelectionResult;
 
       if (isRoot) {
-        // registerIpAsset 호출
-        const response = await client.ipAsset.registerIpAsset({
-          nft: { type: "mint", spgNftContract: spgNftContract },
-          licenseTermsData: licenseTermsData,
-          royaltyShares: [
-            {
-              recipient: "0xb05ff66a7eac8a6e600d83fbdb8c3c1f208fa59e", // 실제 수신자 주소로 변경 필요
-              percentage: 10,
-            },
-          ],
-          ipMetadata: metadata,
+        result = await registerIpAsset({
+          ipMetadata,
+          nftMetadata,
+          licenses: selected,
+          commercialUseConfig: selected.includes("COMMERCIAL_USE")
+            ? { priceIp: Number(commercialUsePrice) }
+            : undefined,
+          commercialRemixConfig: selected.includes("COMMERCIAL_REMIX")
+            ? {
+                priceIp: Number(commercialRemixPrice),
+                revenueSharePct: Number(commercialRemixShare),
+              }
+            : undefined,
         });
-
-        // IPID 저장 필요 (부모 ipId)
-        console.log(
-          `Root IPA created at transaction hash ${response.txHash}, IPA ID: ${response.ipId}, License Terms ID: ${response.licenseTermsIds}`
-        );
       } else {
-        // 파생 IP Asset 등록
-        // TODO: 실제 부모 IP Asset의 IP ID를 가져와야 합니다
-        // 부모 StoryBook에서 ipId를 저장하거나, 데이터베이스에서 조회해야 합니다
-        const parentIpId = "0xDFfA4620230B36592C756138A3F82700AD3c2cCc"; // 부모 IP Asset의 IP ID (실제 값으로 교체 필요)
-
-        // TODO: 부모 IP Asset의 라이선스 텀 ID를 조회해야 합니다
-        // 부모 IP Asset에 등록된 라이선스 텀 중에서 사용할 라이선스 텀 ID를 선택
-        // 예: COMMERCIAL_REMIX 라이선스를 사용하려면 해당 라이선스 텀 ID가 필요
-        // licenseTermsIds는 bigint 배열이어야 합니다
-        // 주의: parentIpIds의 개수와 licenseTermsIds의 개수가 일치해야 합니다
-        // 각 부모 IP ID에 대해 하나의 라이선스 텀 ID가 필요합니다
-        // 하나의 부모 IP Asset에서 파생할 때는 하나의 라이선스 텀 ID만 사용해야 합니다
-        const commercialRemixLicenseTermsId = 2590n; // 부모 IP Asset의 COMMERCIAL_REMIX 라이선스 텀 ID (실제 값으로 교체 필요)
-
-        const response = await client.ipAsset.registerDerivativeIpAsset({
-          nft: { type: "mint", spgNftContract },
-          derivData: {
-            parentIpIds: [parentIpId], // 하나의 부모 IP ID
-            licenseTermsIds: [commercialRemixLicenseTermsId], // 하나의 라이선스 텀 ID (부모 IP ID 개수와 일치)
-          },
-          ipMetadata: {
-            ipMetadataURI:
-              "https://ipfs.io/ipfs/bafkreiardkgvkejqnnkdqp4pamkx2e5bs4lzus5trrw3hgmoa7dlbb6foe",
-            ipMetadataHash: toHex("test-metadata-hash", { size: 32 }),
-            nftMetadataURI:
-              "https://ipfs.io/ipfs/bafkreicexrvs2fqvwblmgl3gnwiwh76pfycvfs66ck7w4s5omluyhti2kq",
-            nftMetadataHash: toHex("test-nft-metadata-hash", { size: 32 }),
-          },
-          royaltyShares: [
-            {
-              recipient: "0xb05ff66a7eac8a6e600d83fbdb8c3c1f208fa59e", // 실제 수신자 주소로 변경 필요
-              percentage: 10,
-            },
-          ],
+        result = await registerDerivativeIpAsset({
+          ipMetadata,
+          nftMetadata,
+          licenses: selected,
+          commercialUseConfig: selected.includes("COMMERCIAL_USE")
+            ? { priceIp: Number(commercialUsePrice) }
+            : undefined,
+          commercialRemixConfig: selected.includes("COMMERCIAL_REMIX")
+            ? {
+                priceIp: Number(commercialRemixPrice),
+                revenueSharePct: Number(commercialRemixShare),
+              }
+            : undefined,
         });
-
-        console.log(
-          `Derivative IPA linked to parent at transaction hash ${response.txHash}, IPA ID: ${response.ipId}`
-        );
-      }
-      /////////////////////////////////////////////////////////////
-      /////////////////////////////////////////////////////////////
-
-      // 성공 후 결과 전달
-      const result: LicenseSelectionResult = {
-        licenses: selected,
-      };
-
-      if (selected.includes("COMMERCIAL_USE")) {
-        result.commercialUse = {
-          priceIp: Number(commercialUsePrice),
-          revenueSharePct: Number(commercialUseShare),
-        };
-      }
-
-      if (selected.includes("COMMERCIAL_REMIX")) {
-        result.commercialRemix = {
-          priceIp: Number(commercialRemixPrice),
-          revenueSharePct: Number(commercialRemixShare),
-        };
       }
 
       onConfirm(result);
