@@ -38,11 +38,13 @@ export async function registerIpAsset({
   const licenseTermsData: LicenseTermsDataItem[] = [];
   const createdLicenseTypes: LicenseType[] = [];
 
+  
   if (licenses.includes("OPEN_USE")) {
     licenseTermsData.push({
       terms: PILFlavor.creativeCommonsAttribution({
         currency: WIP_TOKEN_ADDRESS,
       }),
+      maxLicenseTokens: 3,
     });
     createdLicenseTypes.push("OPEN_USE");
   }
@@ -52,6 +54,7 @@ export async function registerIpAsset({
       terms: PILFlavor.creativeCommonsAttribution({
         currency: WIP_TOKEN_ADDRESS,
       }),
+      maxLicenseTokens: 3,
     });
     createdLicenseTypes.push("NON_COMMERCIAL_REMIX");
   }
@@ -63,6 +66,7 @@ export async function registerIpAsset({
         currency: WIP_TOKEN_ADDRESS,
         royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
       }),
+      maxLicenseTokens: 3,
     });
     createdLicenseTypes.push("COMMERCIAL_USE");
   }
@@ -75,7 +79,7 @@ export async function registerIpAsset({
         currency: WIP_TOKEN_ADDRESS,
         royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
       }),
-      // maxLicenseTokens: 100, // 발행 개수 제한
+      maxLicenseTokens: 3, // 발행 개수 제한
     });
     createdLicenseTypes.push("COMMERCIAL_REMIX");
   }
@@ -114,7 +118,17 @@ export async function registerIpAsset({
     licenseInfo: licenseInfos,
   };
 
-  return result;
+  // ipId와 licenseTermsIds를 반환하기 위해 result에 추가
+  return {
+    ...result,
+    ipId: response.ipId,
+    licenseTermsIds: response.licenseTermsIds ?? [],
+    createdLicenseTypes,
+  } as LicenseSelectionResult & {
+    ipId: string;
+    licenseTermsIds: bigint[];
+    createdLicenseTypes: LicenseType[];
+  };
 }
 
 export async function registerDerivativeIpAsset({
@@ -123,20 +137,12 @@ export async function registerDerivativeIpAsset({
   licenses,
   commercialUseConfig,
   commercialRemixConfig,
+  licenseTermsId,
+  parentIpId,
 }: RegisterIpAssetParams) {
   const client = await createStoryClient();
   const licenseTermsData: LicenseTermsDataItem[] = [];
   const createdLicenseTypes: LicenseType[] = [];
-
-  const licenseTerms1 = await client.license.getLicenseTerms(1300n);
-  const licenseTerms2 = await client.license.getLicenseTerms(1300n);
-  const licenseTerms3 = await client.license.getLicenseTerms(1788n);
-  const licenseTerms4 = await client.license.getLicenseTerms(2441n);
-
-  console.log("licenseTerms1: ", licenseTerms1);
-  console.log("licenseTerms2: ", licenseTerms2);
-  console.log("licenseTerms3: ", licenseTerms3);
-  console.log("licenseTerms4: ", licenseTerms4);
 
   const ipIpfsHash = await uploadJSONToIPFS(ipMetadata, {
     kind: "ip",
@@ -156,6 +162,7 @@ export async function registerDerivativeIpAsset({
         currency: WIP_TOKEN_ADDRESS,
         royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
       }),
+      maxLicenseTokens: 3,
     });
     createdLicenseTypes.push("OPEN_USE");
   }
@@ -168,6 +175,7 @@ export async function registerDerivativeIpAsset({
         currency: WIP_TOKEN_ADDRESS,
         royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
       }),
+      maxLicenseTokens: 3,
     });
     createdLicenseTypes.push("NON_COMMERCIAL_REMIX");
   }
@@ -179,6 +187,7 @@ export async function registerDerivativeIpAsset({
         currency: WIP_TOKEN_ADDRESS,
         royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
       }),
+      maxLicenseTokens: 3,
     });
     createdLicenseTypes.push("COMMERCIAL_USE");
   }
@@ -191,34 +200,25 @@ export async function registerDerivativeIpAsset({
         currency: WIP_TOKEN_ADDRESS,
         royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
       }),
-      // maxLicenseTokens: 100,
+      maxLicenseTokens: 3,
     });
     createdLicenseTypes.push("COMMERCIAL_REMIX");
   }
 
-  const parentIpId = "0xe9bc126Ad103f02432156af150BC401E7209FB6f"; // 부모 IP Asset의 IP ID (실제 값으로 교체 필요)
-
-  // TODO: 부모 IP Asset의 라이선스 텀 ID를 조회해야 합니다
-  // 부모 IP Asset에 등록된 라이선스 텀 중에서 사용할 라이선스 텀 ID를 선택
-  // 예: COMMERCIAL_REMIX 라이선스를 사용하려면 해당 라이선스 텀 ID가 필요
-  // licenseTermsIds는 bigint 배열이어야 합니다
-  // 주의: parentIpIds의 개수와 licenseTermsIds의 개수가 일치해야 합니다
-  // 각 부모 IP ID에 대해 하나의 라이선스 텀 ID가 필요합니다
-  // 하나의 부모 IP Asset에서 파생할 때는 하나의 라이선스 텀 ID만 사용해야 합니다
-  const commercialRemixLicenseTermsId = 1300n; // 부모 IP Asset의 COMMERCIAL_REMIX 라이선스 텀 ID (실제 값으로 교체 필요)
+  // licenseTermsId와 parentIpId가 제공되지 않으면 에러 발생
+  if (!licenseTermsId) {
+    throw new Error("licenseTermsId is required for derivative IP asset registration");
+  }
+  if (!parentIpId) {
+    throw new Error("parentIpId is required for derivative IP asset registration");
+  }
 
   const response = await client.ipAsset.registerDerivativeIpAsset({
     nft: { type: "mint", spgNftContract },
     derivData: {
-      parentIpIds: [parentIpId], // 하나의 부모 IP ID
-      licenseTermsIds: [commercialRemixLicenseTermsId], // 하나의 라이선스 텀 ID (부모 IP ID 개수와 일치)
+      parentIpIds: [parentIpId as `0x${string}`], // 하나의 부모 IP ID
+      licenseTermsIds: [licenseTermsId], // 전달받은 라이선스 텀 ID (부모 IP ID 개수와 일치)
     },
-    royaltyShares: [
-      {
-        recipient: "0x9d09938618226b68df5558ba804c7c7bcd175824", // 실제 수신자 주소로 변경 필요
-        percentage: 10,
-      },
-    ],
     ipMetadata: {
       ipMetadataURI: `https://ipfs.io/ipfs/${ipIpfsHash}`,
       ipMetadataHash: `0x${ipHash}`,
@@ -247,5 +247,16 @@ export async function registerDerivativeIpAsset({
   const result: LicenseSelectionResult = {
     licenseInfo: licenseInfos,
   };
-  return result;
+  
+  // ipId 반환 (derivative의 경우 licenseTermsIds는 부모에서 가져와야 함)
+  return {
+    ...result,
+    ipId: response.ipId,
+    licenseTermsIds: [],
+    createdLicenseTypes,
+  } as LicenseSelectionResult & {
+    ipId: string;
+    licenseTermsIds: bigint[];
+    createdLicenseTypes: LicenseType[];
+  };
 }

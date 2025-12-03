@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { findStoryById } from "../utils/story";
 import { LicenseSelectionModal } from "./LicenseSelectModal";
 import type { StoryBook } from "../types/story";
@@ -22,23 +22,57 @@ export function StoryWriter({ profile }: StoryWriterProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+  const [parent, setParent] = useState<StoryBook | undefined>(undefined);
+  const [isLoadingParent, setIsLoadingParent] = useState(false);
 
   const state = location.state as LocationState | null;
   const parentIdParam = params.id ? Number(params.id) : undefined;
 
-  let parent: StoryBook | undefined = state?.parent;
-  if (!parent && parentIdParam != null) {
-    parent = findStoryById(parentIdParam);
-  }
+  useEffect(() => {
+    const loadParent = async () => {
+      // state에서 parent가 있으면 그대로 사용
+      if (state?.parent) {
+        setParent(state.parent);
+        return;
+      }
+
+      // parentIdParam이 있으면 Supabase에서 조회
+      if (parentIdParam != null) {
+        setIsLoadingParent(true);
+        try {
+          const fetchedParent = await findStoryById(parentIdParam);
+          setParent(fetchedParent);
+        } catch (err) {
+          console.error("Error loading parent story:", err);
+        } finally {
+          setIsLoadingParent(false);
+        }
+      } else {
+        setParent(undefined);
+      }
+    };
+
+    loadParent();
+  }, [state?.parent, parentIdParam]);
 
   const hasParentContext = state?.parent != null || parentIdParam != null;
-  const isRoot = !parent && !hasParentContext;
+  const isRoot = !parent && !hasParentContext && !isLoadingParent;
 
   if (!profile) {
     return (
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="text-center text-sm text-zinc-400">
           <p>You need to connect your wallet and set up your profile first.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoadingParent) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="text-center text-sm text-zinc-400">
+          <p>Loading parent story...</p>
         </div>
       </div>
     );
@@ -94,7 +128,7 @@ export function StoryWriter({ profile }: StoryWriterProps) {
             <div className="pointer-events-none absolute inset-y-10 right-4 w-[5px] rounded-sm bg-zinc-800 shadow-[-3px_0_4px_rgba(0,0,0,0.5)]" />
             <div className="pointer-events-none absolute inset-y-9 right-2.5 w-[5px] rounded-sm bg-zinc-700 shadow-[-3px_0_4px_rgba(0,0,0,0.45)]" />
             <div className="absolute inset-1.5 rounded-[18px] bg-zinc-950/95 overflow-hidden">
-              <div className="pointer-events-none absolute inset-y-8 left-0 w-12 bg-linear-to-r from-zinc-900 via-zinc-950 to-transparent shadow-[inset_-10px_0_14px_rgba(0,0,0,0.6)]" />
+              <div className="pointer-events-none absolute inset-y-8 left-0 w-5 bg-linear-to-r from-zinc-900 via-zinc-950 to-transparent shadow-[inset_-10px_0_14px_rgba(0,0,0,0.6)]" />
               <div className="pointer-events-none absolute inset-y-8 right-3 w-px bg-zinc-600/70" />
               <div className="pointer-events-none absolute bottom-4 left-8 right-4 h-px bg-linear-to-r from-zinc-700 via-zinc-600 to-zinc-700 opacity-70" />
               <div className="relative flex h-full w-full pl-8 pr-8 pt-8 pb-10 md:pl-16 md:pr-14 md:pt-10">
@@ -200,6 +234,7 @@ export function StoryWriter({ profile }: StoryWriterProps) {
         onConfirm={handleConfirmLicenses}
         profile={profile}
         isRoot={isRoot}
+        parentId={parent?.id ?? null}
       />
     </div>
   );

@@ -33,4 +33,6 @@ export type RegisterIpAssetParams = {
   licenses: LicenseType[];
   commercialUseConfig?: CommercialUseConfig;
   commercialRemixConfig?: CommercialRemixConfig;
+  licenseTermsId?: bigint; // derivative IP asset 등록 시 부모의 licenseTermsId
+  parentIpId?: string; // derivative IP asset 등록 시 부모의 IP ID
 };

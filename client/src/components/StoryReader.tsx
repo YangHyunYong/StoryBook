@@ -1,15 +1,18 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../utils/supabaseClient";
 import type { StoryBook } from "../types/story";
 import { StoryDerivativesView } from "./StoryDerivativesView";
-import { findStoryById, findChildrenStories } from "../utils/story";
 
-function computePageNumber(story: StoryBook): number {
+async function computePageNumber(
+  story: StoryBook,
+  getParent: (id: number) => Promise<StoryBook | null>
+): Promise<number> {
   let depth = 1;
   let current: StoryBook | undefined = story;
 
   while (current.parentId != null) {
-    const parent = findStoryById(current.parentId);
+    const parent = await getParent(current.parentId);
     if (!parent) break;
     depth += 1;
     current = parent;
@@ -24,11 +27,69 @@ export function StoryReader() {
   const location = useLocation() as { state?: { openDerivatives?: boolean } };
 
   const storyId = params.id ? Number(params.id) : NaN;
-  const story: StoryBook | undefined = !Number.isNaN(storyId)
-    ? findStoryById(storyId)
-    : undefined;
+  const [story, setStory] = useState<StoryBook | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!story) {
+  useEffect(() => {
+    const fetchStory = async () => {
+      if (Number.isNaN(storyId) || !supabase) {
+        setIsLoading(false);
+        setError("Invalid story ID");
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const { data, error: fetchError } = await supabase
+          .from("story")
+          .select("id, parent_id, title, author, content, image_url, timestamp")
+          .eq("id", storyId)
+          .single();
+
+        if (fetchError) {
+          console.error("Failed to fetch story:", fetchError);
+          setError("Story not found");
+          return;
+        }
+
+        if (!data) {
+          setError("Story not found");
+          return;
+        }
+
+        const mappedStory: StoryBook = {
+          id: Number(data.id),
+          parentId: data.parent_id ? Number(data.parent_id) : null,
+          title: data.title,
+          author: data.author,
+          content: data.content,
+          imageUrl: data.image_url || undefined,
+          timestamp: Number(data.timestamp),
+        };
+        setStory(mappedStory);
+      } catch (err) {
+        console.error("Error fetching story:", err);
+        setError("An error occurred while loading the story");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStory();
+  }, [storyId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="text-center text-sm text-zinc-400">
+          <p>Loading story...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !story) {
     return (
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="text-center text-sm text-zinc-400">
@@ -67,14 +128,100 @@ function StoryReaderInner({
   const [viewMode, setViewMode] = useState<"read" | "derivatives">(
     openDerivativesInitially ? "derivatives" : "read"
   );
+  const [parent, setParent] = useState<StoryBook | null>(null);
+  const [children, setChildren] = useState<StoryBook[]>([]);
+  const [pageNumber, setPageNumber] = useState(1);
 
   const isRoot = story.parentId === null;
-  const children = findChildrenStories(story.id);
-  const hasDerivatives = children.length > 0;
-  const parent =
-    story.parentId != null ? findStoryById(story.parentId) : undefined;
 
-  const pageNumber = computePageNumber(story);
+  useEffect(() => {
+    const fetchRelatedStories = async () => {
+      if (!supabase) {
+        return;
+      }
+
+      try {
+        // 부모 스토리 가져오기
+        if (story.parentId !== null) {
+          const { data: parentData } = await supabase
+            .from("story")
+            .select(
+              "id, parent_id, title, author, content, image_url, timestamp"
+            )
+            .eq("id", story.parentId)
+            .single();
+
+          if (parentData) {
+            setParent({
+              id: Number(parentData.id),
+              parentId: parentData.parent_id
+                ? Number(parentData.parent_id)
+                : null,
+              title: parentData.title,
+              author: parentData.author,
+              content: parentData.content,
+              imageUrl: parentData.image_url || undefined,
+              timestamp: Number(parentData.timestamp),
+            });
+          }
+        }
+
+        // 자식 스토리 가져오기
+        const { data: childrenData } = await supabase
+          .from("story")
+          .select("id, parent_id, title, author, content, image_url, timestamp")
+          .eq("parent_id", story.id)
+          .order("timestamp", { ascending: false });
+
+        if (childrenData) {
+          const mappedChildren: StoryBook[] = childrenData.map((child) => ({
+            id: Number(child.id),
+            parentId: child.parent_id ? Number(child.parent_id) : null,
+            title: child.title,
+            author: child.author,
+            content: child.content,
+            imageUrl: child.image_url || undefined,
+            timestamp: Number(child.timestamp),
+          }));
+          setChildren(mappedChildren);
+        }
+
+        // 페이지 번호 계산
+        const getParent = async (id: number): Promise<StoryBook | null> => {
+          if (!supabase) return null;
+
+          const { data } = await supabase
+            .from("story")
+            .select(
+              "id, parent_id, title, author, content, image_url, timestamp"
+            )
+            .eq("id", id)
+            .single();
+
+          if (!data) return null;
+
+          return {
+            id: Number(data.id),
+            parentId: data.parent_id ? Number(data.parent_id) : null,
+            title: data.title,
+            author: data.author,
+            content: data.content,
+            imageUrl: data.image_url || undefined,
+            timestamp: Number(data.timestamp),
+          };
+        };
+
+        const page = await computePageNumber(story, getParent);
+        setPageNumber(page);
+      } catch (err) {
+        console.error("Error fetching related stories:", err);
+      }
+    };
+
+    fetchRelatedStories();
+  }, [story]);
+
+  const hasDerivatives = children.length > 0;
 
   const setCurrentViewMode = (mode: "read" | "derivatives") => {
     setViewMode(mode);
@@ -120,7 +267,7 @@ function StoryReaderInner({
           <div className="absolute inset-y-4 inset-x-4 md:inset-y-6 md:inset-x-6 rounded-[26px] bg-linear-to-br from-zinc-950 to-zinc-900 shadow-[0_30px_80px_rgba(0,0,0,0.95)]" />
           <div className="absolute inset-y-5 inset-x-5 md:inset-y-7 md:inset-x-7 rounded-[22px] bg-zinc-950 border border-zinc-800/80 shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
             <div className="absolute inset-1.5 rounded-[18px] bg-zinc-950/95 overflow-hidden">
-              <div className="pointer-events-none absolute inset-y-8 left-0 w-12 bg-linear-to-r from-zinc-900 via-zinc-950 to-transparent shadow-[inset_-10px_0_14px_rgba(0,0,0,0.6)]" />
+              <div className="pointer-events-none absolute inset-y-8 left-0 w-5 bg-linear-to-r from-zinc-900 via-zinc-950 to-transparent shadow-[inset_-10px_0_14px_rgba(0,0,0,0.6)]" />
               <div className="pointer-events-none absolute inset-y-8 right-3 w-px bg-zinc-600/70" />
               <div className="pointer-events-none absolute bottom-4 left-8 right-4 h-px bg-linear-to-r from-zinc-700 via-zinc-600 to-zinc-700 opacity-70" />
               <div className="relative flex h-full w-full pl-8 pr-8 pt-8 pb-10 md:pl-20 md:pr-14 md:pt-10">
@@ -167,11 +314,21 @@ function StoryReaderInner({
                           <span className="text-zinc-200">{parent.title}</span>
                         </p>
                       )}
+                      {story.imageUrl && (
+                        <div className="relative w-full rounded-lg">
+                          <img
+                            src={story.imageUrl}
+                            alt={story.title}
+                            className="w-full h-auto object-cover"
+                          />
+                        </div>
+                      )}
                       <p className="whitespace-pre-line">{story.content}</p>
                     </div>
                   ) : (
                     <StoryDerivativesView
                       story={story}
+                      storyId={story.id}
                       onSelectDerivative={handleSelectDerivative}
                     />
                   )}

@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { parseEther } from "viem";
 import {
   registerDerivativeIpAsset,
   registerIpAsset,
 } from "../services/story/registerIpAsset";
 import { generateAndPinImage } from "../services/story/generateAndPinImage";
+import { supabase } from "../utils/supabaseClient";
 
 import type { IpMetadata } from "@story-protocol/core-sdk";
 import type { NftMetadata } from "../types/ipAsset";
@@ -19,6 +21,7 @@ interface LicenseSelectionModalProps {
   onConfirm: (result: LicenseSelectionResult) => void;
   isRoot: boolean;
   profile: UserProfile;
+  parentId?: number | null;
 }
 
 const COMMERCIAL_TYPES: LicenseType[] = ["COMMERCIAL_USE", "COMMERCIAL_REMIX"];
@@ -62,16 +65,73 @@ export function LicenseSelectionModal({
   onConfirm,
   isRoot,
   profile,
+  parentId,
 }: LicenseSelectionModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selected, setSelected] = useState<LicenseType[]>([]);
   const [isPosting, setIsPosting] = useState(false);
+  const [availableLicenseOptions, setAvailableLicenseOptions] = useState<
+    typeof LICENSE_OPTIONS
+  >([]);
+  const [isLoadingLicenses, setIsLoadingLicenses] = useState(true);
   const navigate = useNavigate();
 
   const [commercialUsePrice, setCommercialUsePrice] = useState("");
   const [commercialUseShare, setCommercialUseShare] = useState("");
   const [commercialRemixPrice, setCommercialRemixPrice] = useState("");
   const [commercialRemixShare, setCommercialRemixShare] = useState("");
+
+  // isRoot가 false이고 parentId가 있으면 부모 스토리의 license 정보를 가져와서 필터링
+  useEffect(() => {
+    const fetchParentLicense = async () => {
+      setIsLoadingLicenses(true);
+
+      if (isRoot || !parentId || !supabase) {
+        setAvailableLicenseOptions(LICENSE_OPTIONS);
+        setIsLoadingLicenses(false);
+        return;
+      }
+
+      try {
+        const { data: licenseData, error } = await supabase
+          .from("license")
+          .select("license_info")
+          .eq("id", parentId)
+          .single();
+
+        if (error || !licenseData) {
+          console.error("Failed to fetch parent license:", error);
+          setAvailableLicenseOptions(LICENSE_OPTIONS);
+          setIsLoadingLicenses(false);
+          return;
+        }
+
+        // license_info는 (number, string)[] 형태
+        // string 부분을 추출하여 사용 가능한 라이선스 타입 결정
+        const licenseInfo = licenseData.license_info as [number, string][];
+        console.log("licenseInfo", licenseInfo);
+        const availableTypes = licenseInfo.map(
+          ([, typeString]) => typeString as LicenseType
+        );
+
+        // LICENSE_OPTIONS에서 사용 가능한 타입만 필터링
+        const filteredOptions = LICENSE_OPTIONS.filter((option) =>
+          availableTypes.includes(option.type)
+        );
+
+        setAvailableLicenseOptions(filteredOptions);
+      } catch (err) {
+        console.error("Error fetching parent license:", err);
+        setAvailableLicenseOptions(LICENSE_OPTIONS);
+      } finally {
+        setIsLoadingLicenses(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchParentLicense();
+    }
+  }, [isOpen, isRoot, parentId]);
 
   if (!isOpen) return null;
 
@@ -90,9 +150,15 @@ export function LicenseSelectionModal({
   };
 
   const toggleLicense = (type: LicenseType) => {
-    setSelected((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
+    if (!isRoot) {
+      // derivative 스토리인 경우 하나만 선택 가능
+      setSelected((prev) => (prev.includes(type) ? [] : [type]));
+    } else {
+      // root 스토리인 경우 여러 개 선택 가능
+      setSelected((prev) =>
+        prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+      );
+    }
   };
 
   const hasCommercialSelected = selected.some((t) =>
@@ -174,7 +240,79 @@ export function LicenseSelectionModal({
         image: ipfsUrl,
       };
 
-      let result: LicenseSelectionResult;
+      let result: LicenseSelectionResult & {
+        ipId: string;
+        licenseTermsIds: bigint[];
+        createdLicenseTypes: LicenseType[];
+      };
+
+      // derivative 스토리인 경우 부모의 license_info와 ip_id를 먼저 가져옴
+      let parentLicenseTermsId: bigint | undefined;
+      let parentIpId: string | undefined;
+      if (!isRoot && parentId && supabase && selected.length > 0) {
+        try {
+          // 부모 스토리의 ip_id 가져오기
+          const { data: parentStoryData, error: storyError } = await supabase
+            .from("story")
+            .select("ip_id")
+            .eq("id", parentId)
+            .single();
+
+          if (storyError || !parentStoryData || !parentStoryData.ip_id) {
+            throw new Error(
+              `Failed to fetch parent story ip_id: ${
+                storyError?.message || "No ip_id found"
+              }`
+            );
+          }
+
+          parentIpId = parentStoryData.ip_id;
+
+          // 부모의 license_info에서 licenseTermsId 가져오기
+          const { data: parentLicenseData, error: licenseError } =
+            await supabase
+              .from("license")
+              .select("license_info")
+              .eq("id", parentId)
+              .single();
+
+          if (
+            licenseError ||
+            !parentLicenseData ||
+            !parentLicenseData.license_info
+          ) {
+            throw new Error(
+              `Failed to fetch parent license: ${
+                licenseError?.message || "No license_info found"
+              }`
+            );
+          }
+
+          const parentLicenseInfo = parentLicenseData.license_info as [
+            number,
+            string
+          ][];
+          // 선택한 라이선스 타입에 해당하는 licenseTermsId 찾기
+          const selectedLicenseType = selected[0]; // derivative는 하나만 선택 가능
+          const matchingLicense = parentLicenseInfo.find(
+            ([, typeString]) => typeString === selectedLicenseType
+          );
+
+          if (matchingLicense) {
+            parentLicenseTermsId = BigInt(matchingLicense[0]);
+          } else {
+            throw new Error(
+              `Selected license type ${selectedLicenseType} not found in parent license_info`
+            );
+          }
+        } catch (err) {
+          console.error(
+            "Error fetching parent data for derivative registration:",
+            err
+          );
+          throw err;
+        }
+      }
 
       if (isRoot) {
         result = await registerIpAsset({
@@ -192,6 +330,17 @@ export function LicenseSelectionModal({
             : undefined,
         });
       } else {
+        if (!parentLicenseTermsId) {
+          throw new Error(
+            "licenseTermsId is required for derivative IP asset registration"
+          );
+        }
+        if (!parentIpId) {
+          throw new Error(
+            "parentIpId is required for derivative IP asset registration"
+          );
+        }
+
         result = await registerDerivativeIpAsset({
           ipMetadata,
           nftMetadata,
@@ -205,12 +354,124 @@ export function LicenseSelectionModal({
                 revenueSharePct: Number(commercialRemixShare),
               }
             : undefined,
+          licenseTermsId: parentLicenseTermsId,
+          parentIpId: parentIpId,
         });
+      }
+
+      // license_info 생성: (number, string)[] 형태
+      let licenseInfo: [number, string][] = [];
+
+      if (isRoot) {
+        // root 스토리인 경우: licenseTermsIds와 createdLicenseTypes 배열을 순서대로 매핑
+        licenseInfo = result.licenseTermsIds.map((id: bigint, idx: number) => [
+          Number(id),
+          result.createdLicenseTypes[idx] || "",
+        ]);
+      } else {
+        // derivative 스토리인 경우: 이미 찾은 parentLicenseTermsId와 선택한 라이선스 타입 사용
+        if (parentLicenseTermsId && selected.length > 0) {
+          const selectedLicenseType = selected[0]; // derivative는 하나만 선택 가능
+          licenseInfo = [[Number(parentLicenseTermsId), selectedLicenseType]];
+        }
+      }
+
+      let createdStoryId: number | undefined;
+      // license 테이블에 저장
+      if (supabase) {
+        try {
+          // 가격을 wei 단위로 변환 (bigint 타입에 맞추기 위해)
+          const commercialUsePriceWei =
+            selected.includes("COMMERCIAL_USE") && commercialUsePrice
+              ? BigInt(parseEther(String(commercialUsePrice)))
+              : null;
+
+          const commercialRemixPriceWei =
+            selected.includes("COMMERCIAL_REMIX") && commercialRemixPrice
+              ? BigInt(parseEther(String(commercialRemixPrice)))
+              : null;
+
+          const { data: licenseData, error: licenseError } = await supabase
+            .from("license")
+            .insert({
+              license_info: licenseInfo,
+              commercial_use_price: commercialUsePriceWei
+                ? commercialUsePriceWei.toString()
+                : null,
+              commercial_remix_price: commercialRemixPriceWei
+                ? commercialRemixPriceWei.toString()
+                : null,
+              commercial_remix_share:
+                selected.includes("COMMERCIAL_REMIX") && commercialRemixShare
+                  ? BigInt(Number(commercialRemixShare)).toString()
+                  : null,
+            })
+            .select()
+            .single();
+
+          if (licenseError) {
+            console.error("Failed to save license to Supabase:", licenseError);
+          } else {
+            console.log("License saved to Supabase:", licenseData);
+
+            // story 테이블에 저장
+            // registerIpAsset 실행 시에는 parent_id를 제외
+            const storyData: {
+              title: string;
+              author: string;
+              content: string;
+              image_url: string | null;
+              timestamp: number;
+              ip_id: string;
+              address: string;
+              parent_id?: number | null;
+            } = {
+              title: postTitle,
+              author: profile.nickname,
+              content: postText,
+              image_url: ipfsUrl || null,
+              timestamp: Date.now(),
+              ip_id: result.ipId,
+              address: profile.address,
+            };
+
+            // registerIpAsset이 아닌 경우에만 parent_id 추가
+            if (!isRoot && parentId) {
+              storyData.parent_id = parentId;
+            }
+
+            const { data: storyDataResult, error: storyError } = await supabase
+              .from("story")
+              .insert(storyData)
+              .select()
+              .single();
+
+            if (storyError) {
+              console.error("Failed to save story to Supabase:", storyError);
+            } else {
+              console.log(
+                "Story saved to Supabase successfully:",
+                storyDataResult
+              );
+              // 생성된 story의 id를 사용할 수 있습니다
+              createdStoryId = storyDataResult?.id;
+              if (createdStoryId) {
+                console.log("Created story ID:", createdStoryId);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error saving to Supabase:", error);
+        }
+      } else {
+        console.warn(
+          "Supabase client is not configured. Data not saved to database."
+        );
       }
 
       onConfirm(result);
       resetState();
-      navigate("/");
+      navigate(`/story/${createdStoryId}`);
     } catch (error) {
       console.error("IP Asset 등록 중 오류 발생:", error);
       alert(
@@ -247,31 +508,44 @@ export function LicenseSelectionModal({
         {step === 1 && (
           <div className="space-y-3">
             <p className="text-xs text-gray-400">
-              You can add up to 5 licenses to this asset
+              {isRoot
+                ? "You can add up to 5 licenses to this asset"
+                : "Select one license from the parent story"}
             </p>
-            <div className="space-y-2">
-              {LICENSE_OPTIONS.map((option) => {
-                const isActive = selected.includes(option.type);
-                return (
-                  <button
-                    key={option.type}
-                    type="button"
-                    onClick={() => toggleLicense(option.type)}
-                    className={`w-full rounded-xl border px-3 py-2 text-left text-xs transition
+            {isLoadingLicenses ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-xs text-gray-400">
+                  Loading available licenses...
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {availableLicenseOptions.map((option) => {
+                  console.log("availableLicenseOptions", option);
+                  const isActive = selected.includes(option.type);
+                  return (
+                    <button
+                      key={option.type}
+                      type="button"
+                      onClick={() => toggleLicense(option.type)}
+                      className={`w-full rounded-xl border px-3 py-2 text-left text-xs transition
                       ${
                         isActive
                           ? "border-yellow-400/80 bg-yellow-500/10"
                           : "border-gray-700 hover:bg-gray-800/60"
                       }`}
-                  >
-                    <div className="font-semibold text-sm">{option.title}</div>
-                    <div className="text-[11px] text-gray-400">
-                      {option.description}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                    >
+                      <div className="font-semibold text-sm">
+                        {option.title}
+                      </div>
+                      <div className="text-[11px] text-gray-400">
+                        {option.description}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-3">
               <button
                 className="
@@ -376,12 +650,6 @@ export function LicenseSelectionModal({
                 Back
               </button>
               <div className="flex gap-2">
-                <button
-                  className="px-3 py-1.5 rounded-full text-xs text-gray-300 border border-gray-700 hover:bg-gray-800 transition-colors"
-                  onClick={handleClose}
-                >
-                  Cancel
-                </button>
                 <button
                   className="
                     px-4 py-1.5 rounded-full text-xs font-medium text-black
