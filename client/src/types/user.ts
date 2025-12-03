@@ -1,5 +1,7 @@
+import type { Address } from "viem";
+
 export interface UserProfile {
-  address: string;
+  address: Address;
   nickname: string;
   avatarUrl?: string;
 }

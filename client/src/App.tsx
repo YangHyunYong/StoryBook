@@ -1,13 +1,16 @@
+import { useState } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { Feed } from "./components/Feed";
 import { Header } from "./components/Header";
 import { User } from "./components/User";
-import { Compose } from "./components/Compose";
 import { FloatingWriteButton } from "./components/FloatingWriteButton";
-import { useState } from "react";
-import { PostDetail } from "./components/PostDetail";
 import { ProfileSetupModal } from "./components/ProfileSetupModal";
+
+import { StoryShelf } from "./components/StoryShelf";
+import { StoryReader } from "./components/StoryReader";
+import { StoryWriter } from "./components/StoryWriter";
+
 import type { UserProfile } from "./types/user";
+import type { Address } from "viem";
 
 const STORY_CHAIN_ID_HEX = "0x523"; // 1315
 const STORY_TESTNET_PARAMS = {
@@ -24,12 +27,13 @@ const STORY_TESTNET_PARAMS = {
 
 function App() {
   const location = useLocation();
-  const isComposePage = location.pathname.startsWith("/compose");
+  const isStoryPage = location.pathname.startsWith("/story");
+  const isWritePage = location.pathname.startsWith("/write");
 
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
-  const [pendingAddress, setPendingAddress] = useState<string | null>(null);
+  const [pendingAddress, setPendingAddress] = useState<Address | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const handleConnectWallet = async () => {
@@ -59,7 +63,7 @@ function App() {
 
       if (!accounts || accounts.length === 0) return;
 
-      const selected = accounts[0];
+      const selected = accounts[0] as Address;
       const message = [
         "Sign in to Story Feed",
         `Address: ${selected}`,
@@ -115,7 +119,7 @@ function App() {
       <Header profile={userProfile} />
       <main className="flex-1 w-full max-w-full mx-auto overflow-y-auto">
         <Routes>
-          <Route path="/" element={<Feed />} />
+          <Route path="/" element={<StoryShelf />} />
           <Route
             path="/user"
             element={
@@ -127,11 +131,20 @@ function App() {
               />
             }
           />
-          <Route path="/compose" element={<Compose />} />
-          <Route path="/post/:id" element={<PostDetail />} />
+          <Route path="/story/:id" element={<StoryReader />} />
+          <Route
+            path="/write"
+            element={<StoryWriter profile={userProfile} />}
+          />
+          <Route
+            path="/story/:id/write"
+            element={<StoryWriter profile={userProfile} />}
+          />
         </Routes>
       </main>
-      {!isComposePage && isWalletConnected && <FloatingWriteButton />}
+      {!isStoryPage && !isWritePage && isWalletConnected && (
+        <FloatingWriteButton />
+      )}
       <ProfileSetupModal
         isOpen={isProfileModalOpen}
         address={pendingAddress}

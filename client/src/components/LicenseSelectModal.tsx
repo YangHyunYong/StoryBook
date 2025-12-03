@@ -1,12 +1,24 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  registerDerivativeIpAsset,
+  registerIpAsset,
+} from "../services/story/registerIpAsset";
+import { generateAndPinImage } from "../services/story/generateAndPinImage";
+
+import type { IpMetadata } from "@story-protocol/core-sdk";
+import type { NftMetadata } from "../types/ipAsset";
 import type { LicenseType, LicenseSelectionResult } from "../types/license";
+import type { UserProfile } from "../types/user";
 
 interface LicenseSelectionModalProps {
   isOpen: boolean;
+  postTitle: string;
   postText: string;
   onClose: () => void;
   onConfirm: (result: LicenseSelectionResult) => void;
+  isRoot: boolean;
+  profile: UserProfile;
 }
 
 const COMMERCIAL_TYPES: LicenseType[] = ["COMMERCIAL_USE", "COMMERCIAL_REMIX"];
@@ -44,12 +56,16 @@ const LICENSE_OPTIONS: {
 
 export function LicenseSelectionModal({
   isOpen,
+  postTitle,
   postText,
   onClose,
   onConfirm,
+  isRoot,
+  profile,
 }: LicenseSelectionModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selected, setSelected] = useState<LicenseType[]>([]);
+  const [isPosting, setIsPosting] = useState(false);
   const navigate = useNavigate();
 
   const [commercialUsePrice, setCommercialUsePrice] = useState("");
@@ -127,28 +143,84 @@ export function LicenseSelectionModal({
     setStep(3);
   };
 
-  const handlePost = () => {
-    const result: LicenseSelectionResult = {
-      licenses: selected,
-    };
+  const handlePost = async () => {
+    try {
+      setIsPosting(true);
+      const { imageUrl, ipfsUrl } = await generateAndPinImage(
+        postTitle,
+        postText
+      );
+      console.log("imageUrl: ", imageUrl);
+      console.log("ipfsUrl: ", ipfsUrl);
 
-    if (selected.includes("COMMERCIAL_USE")) {
-      result.commercialUse = {
-        priceIp: Number(commercialUsePrice),
-        revenueSharePct: Number(commercialUseShare),
+      const ipMetadata: IpMetadata = {
+        title: postTitle,
+        description: postText,
+        image: ipfsUrl,
+        mediaUrl: ipfsUrl,
+        mediaType: "image/plain",
+        creators: [
+          {
+            name: profile.nickname,
+            address: profile.address,
+            contributionPercent: 100,
+          },
+        ],
       };
-    }
 
-    if (selected.includes("COMMERCIAL_REMIX")) {
-      result.commercialRemix = {
-        priceIp: Number(commercialRemixPrice),
-        revenueSharePct: Number(commercialRemixShare),
+      const nftMetadata: NftMetadata = {
+        name: postTitle,
+        description: postText,
+        image: ipfsUrl,
       };
-    }
 
-    onConfirm(result);
-    resetState();
-    navigate("/");
+      let result: LicenseSelectionResult;
+
+      if (isRoot) {
+        result = await registerIpAsset({
+          ipMetadata,
+          nftMetadata,
+          licenses: selected,
+          commercialUseConfig: selected.includes("COMMERCIAL_USE")
+            ? { priceIp: Number(commercialUsePrice) }
+            : undefined,
+          commercialRemixConfig: selected.includes("COMMERCIAL_REMIX")
+            ? {
+                priceIp: Number(commercialRemixPrice),
+                revenueSharePct: Number(commercialRemixShare),
+              }
+            : undefined,
+        });
+      } else {
+        result = await registerDerivativeIpAsset({
+          ipMetadata,
+          nftMetadata,
+          licenses: selected,
+          commercialUseConfig: selected.includes("COMMERCIAL_USE")
+            ? { priceIp: Number(commercialUsePrice) }
+            : undefined,
+          commercialRemixConfig: selected.includes("COMMERCIAL_REMIX")
+            ? {
+                priceIp: Number(commercialRemixPrice),
+                revenueSharePct: Number(commercialRemixShare),
+              }
+            : undefined,
+        });
+      }
+
+      onConfirm(result);
+      resetState();
+      navigate("/");
+    } catch (error) {
+      console.error("IP Asset 등록 중 오류 발생:", error);
+      alert(
+        `IP Asset 등록 실패: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   const isReviewStep = step === 3;
@@ -167,6 +239,7 @@ export function LicenseSelectionModal({
             className="px-2 py-1 rounded-full text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
             onClick={handleClose}
             aria-label="Close"
+            disabled={isPosting}
           >
             X
           </button>
@@ -223,7 +296,6 @@ export function LicenseSelectionModal({
               single use only. Buyers will need to purchase a new license for
               each additional use.
             </p>
-
             {selected.includes("COMMERCIAL_USE") && (
               <div className="space-y-2 border border-gray-800 rounded-xl p-3">
                 <h3 className="text-sm font-semibold mb-1">
@@ -254,6 +326,7 @@ export function LicenseSelectionModal({
                     placeholder="Enter revenue share"
                     disabled
                     readOnly
+                    value={commercialUseShare}
                   />
                   <p className="text-[10px] text-gray-500">
                     Revenue share for Commercial Use is fixed.
@@ -332,7 +405,13 @@ export function LicenseSelectionModal({
               Here’s an overview of your registration.
             </p>
             <div className="space-y-1 border border-gray-800 rounded-xl p-3">
-              <div className="text-[11px] text-gray-400 mb-1">Your post</div>
+              <div className="text-[11px] text-gray-400 mb-1">Title</div>
+              <p className="text-sm text-gray-100 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                {postTitle}
+              </p>
+            </div>
+            <div className="space-y-1 border border-gray-800 rounded-xl p-3">
+              <div className="text-[11px] text-gray-400 mb-1">Content</div>
               <p className="text-sm text-gray-100 whitespace-pre-wrap max-h-32 overflow-y-auto">
                 {postText}
               </p>
@@ -355,7 +434,12 @@ export function LicenseSelectionModal({
             </div>
             <div className="flex justify-between pt-2">
               <button
-                className="px-3 py-1.5 rounded-full text-xs text-gray-300 border border-gray-700 hover:bg-gray-800 transition-colors"
+                className="
+                  px-3 py-1.5 rounded-full text-xs text-gray-300 
+                  border border-gray-700 hover:bg-gray-800 
+                  transition-colors
+                  disabled:opacity-40 disabled:cursor-not-allowed
+                "
                 onClick={() => {
                   if (hasCommercialSelected) {
                     setStep(2);
@@ -363,6 +447,7 @@ export function LicenseSelectionModal({
                     setStep(1);
                   }
                 }}
+                disabled={isPosting}
               >
                 Back
               </button>
@@ -373,10 +458,14 @@ export function LicenseSelectionModal({
                     btn-ip-yellow
                     hover:brightness-110 active:brightness-95
                     transition
+                    disabled:opacity-40 disabled:cursor-not-allowed
                   "
                   onClick={handlePost}
+                  disabled={isPosting}
                 >
-                  Get some $IP to Register
+                  <span>
+                    {isPosting ? "Registering..." : "Get some $IP to Register"}
+                  </span>
                 </button>
               </div>
             </div>

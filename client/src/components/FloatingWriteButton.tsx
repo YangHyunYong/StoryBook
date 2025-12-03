@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 export function FloatingWriteButton() {
   return (
-    <Link to="/compose" className="fixed bottom-6 right-4 z-50">
+    <Link to="/write" className="fixed bottom-6 right-4 z-50">
       <div className="relative w-16 h-16">
         <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
           <defs>
