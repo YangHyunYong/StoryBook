@@ -9,6 +9,7 @@ import { StoryShelf } from "./components/StoryShelf";
 import { StoryReader } from "./components/StoryReader";
 import { StoryWriter } from "./components/StoryWriter";
 
+import { supabase } from "./utils/supabaseClient";
 import type { UserProfile } from "./types/user";
 import type { Address } from "viem";
 
@@ -75,6 +76,38 @@ function App() {
         params: [message, selected],
       });
 
+      // Supabase에서 해당 주소의 사용자 조회
+      if (supabase) {
+        try {
+          const { data: userData, error } = await supabase
+            .from("user")
+            .select("address, nickname, avatar_url")
+            .eq("address", selected)
+            .single();
+
+          if (error && error.code !== "PGRST116") {
+            // PGRST116은 "no rows returned" 에러 (사용자가 없는 경우)
+            console.error("Failed to fetch user from Supabase:", error);
+          }
+
+          if (userData) {
+            // 사용자가 존재하면 바로 로그인
+            const profile: UserProfile = {
+              address: userData.address,
+              nickname: userData.nickname,
+              avatarUrl: userData.avatar_url || undefined,
+            };
+
+            setUserProfile(profile);
+            setIsWalletConnected(true);
+            return; // 모달을 띄우지 않고 종료
+          }
+        } catch (error) {
+          console.error("Error fetching user from Supabase:", error);
+        }
+      }
+
+      // 사용자가 없으면 프로필 설정 모달 띄우기
       setPendingAddress(selected);
       setIsProfileModalOpen(true);
     } catch (error) {
@@ -89,7 +122,7 @@ function App() {
     setIsProfileModalOpen(false);
   };
 
-  const handleSaveProfile = (data: {
+  const handleSaveProfile = async (data: {
     nickname: string;
     avatarDataUrl?: string;
   }) => {
@@ -100,6 +133,35 @@ function App() {
       nickname: data.nickname,
       avatarUrl: data.avatarDataUrl,
     };
+
+    // Supabase user 테이블에 저장
+    if (supabase) {
+      try {
+        const { error } = await supabase.from("user").upsert(
+          {
+            address: pendingAddress,
+            nickname: data.nickname,
+            avatar_url: data.avatarDataUrl || null,
+          },
+          {
+            onConflict: "address", // address가 이미 있으면 업데이트
+          }
+        );
+
+        if (error) {
+          console.error("Failed to save user profile to Supabase:", error);
+          // 에러가 발생해도 로컬 상태는 업데이트 (사용자 경험을 위해)
+        } else {
+          console.log("User profile saved to Supabase successfully");
+        }
+      } catch (error) {
+        console.error("Error saving user profile:", error);
+      }
+    } else {
+      console.warn(
+        "Supabase client is not configured. User profile not saved to database."
+      );
+    }
 
     setUserProfile(profile);
     setIsWalletConnected(true);
