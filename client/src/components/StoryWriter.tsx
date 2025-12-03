@@ -1,14 +1,10 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useState, type FormEvent } from "react";
-import axios from "axios";
 import { findStoryById } from "../utils/story";
 import { LicenseSelectionModal } from "./LicenseSelectModal";
 import type { StoryBook } from "../types/story";
 import type { LicenseSelectionResult } from "../types/license";
 import type { UserProfile } from "../types/user";
-
-// API 기본 URL 설정 (환경 변수 또는 기본값)
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 type LocationState = {
   parent?: StoryBook;
@@ -26,8 +22,6 @@ export function StoryWriter({ profile }: StoryWriterProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const state = location.state as LocationState | null;
   const parentIdParam = params.id ? Number(params.id) : undefined;
@@ -79,41 +73,7 @@ export function StoryWriter({ profile }: StoryWriterProps) {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!content.trim() || !title.trim()) return;
-
-    try {
-      setIsGeneratingImage(true);
-
-      // 이미지 생성 API 호출 주석 처리
-      // const response = await axios.post(
-      //   `${API_BASE_URL}/stability/generate`,
-      //   { prompt: content },
-      //   {
-      //     headers: {
-      //       "Content-Type": "application/json",
-      //     },
-      //   }
-      // );
-
-      // if (response.data?.imageUrl) {
-      //   setImageUrl(response.data.imageUrl);
-
-      //   // IPFS에 업로드할 이미지 URL
-      //   console.log(response.data.imageUrl);
-      // }
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error(
-          "Failed to generate image:",
-          error.response?.data || error.message
-        );
-      } else {
-        console.error("Error calling stability API:", error);
-      }
-    } finally {
-      setIsGeneratingImage(false);
-      // After image generation request, open the license selection modal
-      setIsLicenseModalOpen(true);
-    }
+    setIsLicenseModalOpen(true);
   };
 
   const handleCancel = () => {
@@ -202,11 +162,6 @@ export function StoryWriter({ profile }: StoryWriterProps) {
                         />
                       </div>
                     </form>
-                    {imageUrl && (
-                      <div className="mb-1 text-[10px] text-zinc-400">
-                        Story illustration generated.
-                      </div>
-                    )}
                     <div className="mt-2 flex items-center justify-between">
                       <button
                         type="button"
@@ -218,9 +173,7 @@ export function StoryWriter({ profile }: StoryWriterProps) {
                       <button
                         type="submit"
                         form="story-writer-form"
-                        disabled={
-                          !title.trim() || !content.trim() || isGeneratingImage
-                        }
+                        disabled={!title.trim() || !content.trim()}
                         className="
                           px-4 py-1.5 rounded-full text-xs font-medium text-black
                           btn-ip-yellow
@@ -229,9 +182,7 @@ export function StoryWriter({ profile }: StoryWriterProps) {
                           disabled:opacity-40 disabled:cursor-not-allowed
                         "
                       >
-                        <span className="sm:inline">
-                          {isGeneratingImage ? "Generating..." : "Register"}
-                        </span>
+                        <span className="sm:inline">Register</span>
                       </button>
                     </div>
                   </div>
