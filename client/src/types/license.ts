@@ -4,13 +4,18 @@ export type LicenseType =
   | "COMMERCIAL_USE"
   | "COMMERCIAL_REMIX";
 
+export type LicenseInfo = {
+  licenseType: LicenseType;
+  licenseTermsId: string;
+};
+
 export interface CommercialLicenseConfig {
   priceIp: number;
   revenueSharePct: number;
 }
 
 export interface LicenseSelectionResult {
-  licenses: LicenseType[];
+  licenseInfo: LicenseInfo[];
   commercialUse?: CommercialLicenseConfig;
   commercialRemix?: CommercialLicenseConfig;
 }
