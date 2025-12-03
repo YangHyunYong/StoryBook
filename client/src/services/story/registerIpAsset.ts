@@ -16,10 +16,16 @@ export async function registerIpAsset({
 }: RegisterIpAssetParams) {
   const client = await createStoryClient();
 
-  const ipIpfsHash = await uploadJSONToIPFS(ipMetadata);
+  const ipIpfsHash = await uploadJSONToIPFS(ipMetadata, {
+    kind: "ip",
+    baseName: ipMetadata.title,
+  });
   const ipHash = await sha256Hex(JSON.stringify(ipMetadata));
 
-  const nftIpfsHash = await uploadJSONToIPFS(nftMetadata);
+  const nftIpfsHash = await uploadJSONToIPFS(nftMetadata, {
+    kind: "nft",
+    baseName: nftMetadata.name,
+  });
   const nftHash = await sha256Hex(JSON.stringify(nftMetadata));
   const licenseTermsData: LicenseTermsDataItem[] = [];
 
@@ -57,7 +63,7 @@ export async function registerIpAsset({
         currency: WIP_TOKEN_ADDRESS,
         royaltyPolicy: "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E",
       }),
-      maxLicenseTokens: 100, // 발행 개수 제한
+      // maxLicenseTokens: 100, // 발행 개수 제한
     });
   }
 

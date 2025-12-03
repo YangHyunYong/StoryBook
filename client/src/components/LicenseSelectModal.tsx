@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registerIpAsset } from "../services/story/registerIpAsset";
-import type { IpMetadata } from "@story-protocol/core-sdk";
-import type { NftMetadata } from "../types/ipAsset";
-
 import { createStoryClient } from "../utils/storyClient";
 import { PILFlavor, WIP_TOKEN_ADDRESS } from "@story-protocol/core-sdk";
 import { toHex } from "viem";
+import { generateAndPinImage } from "../services/story/generateAndPinImage";
+
+import type { IpMetadata } from "@story-protocol/core-sdk";
+import type { NftMetadata } from "../types/ipAsset";
 import type { LicenseType, LicenseSelectionResult } from "../types/license";
 import type { UserProfile } from "../types/user";
 
@@ -145,12 +146,18 @@ export function LicenseSelectionModal({
   const handlePost = async () => {
     try {
       setIsPosting(true);
+      const { imageUrl, ipfsUrl } = await generateAndPinImage(
+        postTitle,
+        postText
+      );
+      console.log("imageUrl: ", imageUrl);
+      console.log("ipfsUrl: ", ipfsUrl);
 
       const ipMetadata: IpMetadata = {
         title: postTitle,
         description: postText,
-        image: "https://picsum.photos/200",
-        mediaUrl: "https://picus.photos/200",
+        image: ipfsUrl,
+        mediaUrl: ipfsUrl,
         mediaType: "image/plain",
         creators: [
           {
@@ -164,7 +171,7 @@ export function LicenseSelectionModal({
       const nftMetadata: NftMetadata = {
         name: postTitle,
         description: postText,
-        image: "https://picsum.photos/600/800?random=42",
+        image: ipfsUrl,
       };
 
       await registerIpAsset({
