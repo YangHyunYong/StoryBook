@@ -7,12 +7,19 @@ export default async function handler(
   res: VercelResponse
 ) {
   // CORS 헤더 설정 - 모든 요청에 대해 먼저 설정 (OPTIONS 포함)
+  // OPTIONS 요청은 가장 먼저 처리
+  if (req.method === "OPTIONS") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
+    res.setHeader("Access-Control-Max-Age", "86400");
+    return res.status(200).end();
+  }
+
+  // 일반 요청에 대한 CORS 헤더 설정
   const origin = req.headers.origin;
-  
-  // 모든 Vercel 도메인과 localhost 허용
   const allowOrigin = origin || "*";
 
-  // CORS 헤더 설정 (모든 요청에 대해)
   res.setHeader("Access-Control-Allow-Origin", allowOrigin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader(
@@ -24,11 +31,6 @@ export default async function handler(
     "Content-Type, Authorization, X-Requested-With, Accept"
   );
   res.setHeader("Access-Control-Max-Age", "86400");
-
-  // OPTIONS 요청 (preflight)은 즉시 응답
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });

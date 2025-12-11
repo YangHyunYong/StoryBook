@@ -23,7 +23,8 @@ export async function generateAndPinImage(
     const baseUrl = API_BASE_URL.endsWith("/") 
       ? API_BASE_URL.slice(0, -1) 
       : API_BASE_URL;
-    const endpoint = "/stability/generate";
+    // 서버의 실제 API 경로 사용 (rewrites를 통해 /stability로 매핑됨)
+    const endpoint = "/api/stability/generate";
     const url = baseUrl ? `${baseUrl}${endpoint}` : endpoint;
     
     const response = await axios.post(
