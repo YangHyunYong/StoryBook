@@ -6,21 +6,33 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // CORS 헤더 설정
+  // CORS 헤더 설정 (OPTIONS 요청을 먼저 처리)
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    "https://story-x-dsrv.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ];
+  
+  const allowOrigin = origin && allowedOrigins.includes(origin) 
+    ? origin 
+    : "*";
+
+  res.setHeader("Access-Control-Allow-Origin", allowOrigin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
     "Access-Control-Allow-Methods",
     "GET,OPTIONS,PATCH,DELETE,POST,PUT"
   );
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version"
+    "Content-Type, Authorization, X-Requested-With"
   );
+  res.setHeader("Access-Control-Max-Age", "86400"); // 24시간
 
+  // OPTIONS 요청은 즉시 응답 (preflight)
   if (req.method === "OPTIONS") {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   if (req.method !== "POST") {
