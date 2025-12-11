@@ -6,31 +6,38 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // CORS 헤더 설정 - 모든 요청에 대해 먼저 설정 (OPTIONS 포함)
-  // OPTIONS 요청은 가장 먼저 처리
-  if (req.method === "OPTIONS") {
+  // 허용된 오리진 목록
+  const allowedOrigins = [
+    "https://story-x-dsrv.vercel.app",
+    "https://story-x-dsrv-sbw8.vercel.app", // 서버 자체 도메인도 허용
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ];
+
+  // 요청의 origin 확인
+  const origin = req.headers.origin;
+  const isAllowedOrigin = origin && allowedOrigins.includes(origin);
+  
+  // CORS 헤더 설정
+  if (isAllowedOrigin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  } else {
+    // 개발 환경이나 origin이 없는 경우 (예: Postman)
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
-    res.setHeader("Access-Control-Max-Age", "86400");
-    return res.status(200).end();
+  }
+  
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
+  res.setHeader("Access-Control-Max-Age", "86400");
+
+  // OPTIONS 요청 (preflight)은 즉시 응답
+  if (req.method === "OPTIONS") {
+    res.status(200);
+    res.end();
+    return;
   }
 
-  // 일반 요청에 대한 CORS 헤더 설정
-  const origin = req.headers.origin;
-  const allowOrigin = origin || "*";
-
-  res.setHeader("Access-Control-Allow-Origin", allowOrigin);
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, Accept"
-  );
-  res.setHeader("Access-Control-Max-Age", "86400");
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
