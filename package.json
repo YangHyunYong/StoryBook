@@ -1,0 +1,28 @@
+{
+  "name": "stroy-x-dsrv",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YangHyunYong/stroy-x-dsrv.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/YangHyunYong/stroy-x-dsrv/issues"
+  },
+  "homepage": "https://github.com/YangHyunYong/stroy-x-dsrv#readme",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "@vercel/node": "^5.5.15"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "form-data": "^4.0.5"
+  }
+}

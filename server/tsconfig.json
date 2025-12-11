@@ -2,13 +2,14 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "CommonJS",
-    "rootDir": "src",
     "outDir": "dist",
     "esModuleInterop": true,
-    "strict": true
+    "strict": true,
+    "types": ["@vercel/node"]
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "api/**/*"
   ],
   "exclude": [
     "node_modules",
