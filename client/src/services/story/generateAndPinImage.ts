@@ -6,8 +6,8 @@ import {
 } from "../../utils/ipfs";
 
 // API 기본 URL 설정 (환경 변수 또는 기본값)
-// 빈 문자열이면 상대 경로 사용 (같은 도메인)
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+// 서버가 별도 프로젝트에 배포된 경우 서버 URL을 명시적으로 설정
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://story-x-dsrv-sbw8.vercel.app";
 
 export type GenerateAndPinImageResult = {
   imageUrl: string;
