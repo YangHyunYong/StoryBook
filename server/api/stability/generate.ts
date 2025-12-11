@@ -9,7 +9,7 @@ export default async function handler(
   // 허용된 오리진 목록
   const allowedOrigins = [
     "https://story-x-dsrv.vercel.app",
-    "https://story-x-dsrv-sbw8.vercel.app", // 서버 자체 도메인도 허용
+    "https://story-x-dsrv-sbw8.vercel.app",
     "http://localhost:5173",
     "http://localhost:3000",
   ];
@@ -18,24 +18,28 @@ export default async function handler(
   const origin = req.headers.origin;
   const isAllowedOrigin = origin && allowedOrigins.includes(origin);
   
-  // CORS 헤더 설정
+  // CORS 헤더 설정 - 모든 요청에 대해 먼저 설정
   if (isAllowedOrigin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
+  } else if (origin) {
+    // 알 수 없는 origin이지만 일단 허용 (개발용)
+    res.setHeader("Access-Control-Allow-Origin", origin);
   } else {
-    // 개발 환경이나 origin이 없는 경우 (예: Postman)
+    // origin이 없는 경우 (예: Postman, curl)
     res.setHeader("Access-Control-Allow-Origin", "*");
   }
   
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
   res.setHeader("Access-Control-Max-Age", "86400");
+  
+  if (isAllowedOrigin) {
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
 
   // OPTIONS 요청 (preflight)은 즉시 응답
   if (req.method === "OPTIONS") {
-    res.status(200);
-    res.end();
-    return;
+    return res.status(200).send("");
   }
 
 
