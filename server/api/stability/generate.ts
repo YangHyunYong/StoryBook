@@ -6,27 +6,13 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // CORS 헤더 설정 (모든 요청에 대해 먼저 설정)
-  const origin = req.headers.origin || req.headers.referer?.split("/").slice(0, 3).join("/");
+  // CORS 헤더 설정 - 모든 요청에 대해 먼저 설정 (OPTIONS 포함)
+  const origin = req.headers.origin;
   
-  // 허용된 오리진 목록 (Vercel 도메인 포함)
-  const allowedOrigins = [
-    "https://story-x-dsrv.vercel.app",
-    "https://story-x-dsrv-sbw8.vercel.app",
-    "http://localhost:5173",
-    "http://localhost:3000",
-  ];
-  
-  // 와일드카드 서브도메인 지원
-  const isAllowedOrigin = origin && (
-    allowedOrigins.includes(origin) ||
-    origin.includes("story-x-dsrv") ||
-    origin.includes("localhost")
-  );
-  
-  const allowOrigin = isAllowedOrigin ? origin : "*";
+  // 모든 Vercel 도메인과 localhost 허용
+  const allowOrigin = origin || "*";
 
-  // CORS 헤더 설정
+  // CORS 헤더 설정 (모든 요청에 대해)
   res.setHeader("Access-Control-Allow-Origin", allowOrigin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader(
