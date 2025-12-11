@@ -15,12 +15,12 @@ export default async function handler(
   ];
 
   // 요청의 origin 확인
-  const origin = req.headers.origin;
-  const isAllowedOrigin = origin && allowedOrigins.includes(origin);
+  const origin = req.headers.origin as string | undefined;
   
   // CORS 헤더 설정 - 모든 요청에 대해 먼저 설정
-  if (isAllowedOrigin) {
+  if (origin && allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
   } else if (origin) {
     // 알 수 없는 origin이지만 일단 허용 (개발용)
     res.setHeader("Access-Control-Allow-Origin", origin);
@@ -32,16 +32,13 @@ export default async function handler(
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
   res.setHeader("Access-Control-Max-Age", "86400");
-  
-  if (isAllowedOrigin) {
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-  }
 
   // OPTIONS 요청 (preflight)은 즉시 응답
   if (req.method === "OPTIONS") {
-    return res.status(200).send("");
+    res.status(200);
+    res.end();
+    return;
   }
-
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -104,4 +101,3 @@ export default async function handler(
     return res.status(500).json({ error: "internal_error" });
   }
 }
-
