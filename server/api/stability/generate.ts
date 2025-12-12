@@ -35,9 +35,7 @@ export default async function handler(
 
   // OPTIONS 요청 (preflight)은 즉시 응답
   if (req.method === "OPTIONS") {
-    res.status(200);
-    res.end();
-    return;
+    return res.status(200).send("");
   }
 
   if (req.method !== "POST") {
